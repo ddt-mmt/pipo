@@ -19,40 +19,76 @@ pip install -e ./pipo
 
 Once installed, `pipo` becomes a global command available in your terminal.
 
-## Usage
+## Global Options
 
-Because `pipo` is installed globally, **you can run it from any directory** (e.g., `/root`, `/home`, etc.). You just need to tell it which project you want to scan.
-
-**Scenario 1: Scanning the directory you are currently in**
-
-If you are already inside the project you want to scan, simply run `pipo` without any arguments.
-
-```bash
-# Navigate to your project directory
-cd /path/to/your/project
-
-# Run pipo to scan the current directory
-pipo
-```
-
-**Scenario 2: Scanning a specific directory from anywhere**
-
-You can also tell `pipo` the exact path of the project you want to scan, regardless of your current location.
-
-```bash
-# You can be in any directory, for example, your home directory
-cd ~
-
-# Tell pipo to scan a specific project path
-pipo /root/projek-migrasi
-```
-
-In both cases, the resulting `requirements.txt` file will be created inside the scanned project directory (e.g., inside `/path/to/your/project` or `/root/projek-migrasi`).
-
-## Command-Line Options
+These options can be used with `pipo` or any of its subcommands.
 
 *   `pipo --help` or `pipo -h`
     *   Shows the help message with all available commands and options.
 
 *   `pipo --version` or `pipo -v`
     *   Shows the currently installed version of `pipo`.
+
+## Commands
+
+`pipo` provides several commands to manage your Python projects.
+
+### `pipo scan [path]`
+
+Scans a Python project directory and generates a `requirements.txt` file based on its imports. If `path` is not provided, it scans the current directory.
+
+**Usage:**
+
+```bash
+# Scan the current directory
+pipo scan
+
+# Scan a specific directory (e.g., your project at /root/my_project)
+pipo scan /root/my_project
+```
+
+In both cases, the resulting `requirements.txt` file will be created inside the scanned project directory.
+
+### `pipo update`
+
+Updates the `pipo` tool to the latest version by pulling changes from its Git repository and reinstalling it.
+
+**Usage:**
+
+```bash
+pipo update
+```
+
+### `pipo uninstall`
+
+Uninstalls the `pipo` tool from your system.
+
+**Usage:**
+
+```bash
+pipo uninstall
+```
+
+### `pipo dockerize [path] [--app-type {flask,django,script}] [--main-file MAIN_FILE] [--port PORT]`
+
+Generates a basic `Dockerfile` for a Python project. If `path` is not provided, it generates the Dockerfile in the current directory.
+
+**Arguments:**
+
+*   `path`: The path to the project directory where the Dockerfile will be generated (defaults to current directory).
+*   `--app-type`: Type of Python application (choices: `flask`, `django`, `script`). Default is `flask`.
+*   `--main-file`: The main application file (e.g., `app.py`, `manage.py`). Default is `app.py`.
+*   `--port`: The port your application listens on. Default is `5000`.
+
+**Usage Examples:**
+
+```bash
+# Generate Dockerfile for a Flask app in the current directory (default settings)
+pipo dockerize
+
+# Generate Dockerfile for a Django app in a specific project folder
+pipo dockerize /path/to/my_django_project --app-type django --main-file manage.py --port 8000
+
+# Generate Dockerfile for a simple Python script
+pipo dockerize ./my_script_project --app-type script --main-file run.py
+```
