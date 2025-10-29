@@ -2,6 +2,7 @@ import os
 import ast
 import argparse
 import sys
+import importlib.metadata
 
 def get_std_libs():
     """Fetches the list of standard library modules for the current Python version."""
@@ -17,7 +18,7 @@ def get_std_libs():
         return {
             "os", "sys", "ast", "argparse", "time", "datetime", "math", "random", "json",
             "re", "subprocess", "collections", "functools", "itertools", "pathlib", "socket",
-            "select", "string", "traceback", "unittest", "urllib", "logging", "threading"
+            "select", "string", "traceback", "unittest", "urllib", "logging", "threading", "importlib"
             # This is not exhaustive and is a limitation of the fallback.
         }
 
@@ -45,8 +46,26 @@ def find_imports(path):
 
 def main():
     """Main entry point for the pipo CLI tool."""
-    parser = argparse.ArgumentParser(description="Generate a requirements.txt file for a Python project.")
-    parser.add_argument('path', nargs='?', default='.', help='Path to the project directory (default: current directory)')
+    try:
+        version = importlib.metadata.version('pipo')
+    except importlib.metadata.PackageNotFoundError:
+        version = '0.0.1' # Fallback version if package is not installed
+
+    parser = argparse.ArgumentParser(
+        description="A modern tool to generate requirements.txt for a Python project.",
+        epilog="Visit https://github.com/ddt-mmt/pipo for more information."
+    )
+    parser.add_argument(
+        '-v', '--version',
+        action='version',
+        version=f'%(prog)s {version}'
+    )
+    parser.add_argument(
+        'path',
+        nargs='?',
+        default='.',
+        help='The path to the Python project directory (defaults to the current directory).'
+    )
     args = parser.parse_args()
 
     project_path = os.path.abspath(args.path)
