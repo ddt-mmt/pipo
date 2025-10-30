@@ -65,6 +65,23 @@ def test_pipo_init_ci_command_github_actions(temp_project_dir):
     assert "pipo test ." in content
     assert "pipo dockerize ." in content
 
+def test_pipo_init_ci_command_with_docker_image_name(temp_project_dir):
+    """Test 'pipo init-ci' command generates config with custom Docker image name."""
+    custom_image_name = "my_user/my_custom_app"
+    result = run_pipo_command(["init-ci", str(temp_project_dir), "--docker-image-name", custom_image_name])
+    assert result.returncode == 0
+    ci_config_path = temp_project_dir / ".github" / "workflows" / "ci.yml"
+    content = ci_config_path.read_text()
+    assert f"docker-image-name: '{custom_image_name}'" in content
+
+def test_pipo_init_ci_command_with_push_docker_image(temp_project_dir):
+    """Test 'pipo init-ci' command generates config with push-docker-image enabled."""
+    result = run_pipo_command(["init-ci", str(temp_project_dir), "--push-docker-image"])
+    assert result.returncode == 0
+    ci_config_path = temp_project_dir / ".github" / "workflows" / "ci.yml"
+    content = ci_config_path.read_text()
+    assert "push-docker-image: true" in content
+
 def test_pipo_init_ci_command_unsupported_platform(temp_project_dir):
     """Test 'pipo init-ci' command with an unsupported platform."""
     result = run_pipo_command(["init-ci", str(temp_project_dir), "--platform", "unsupported-ci"])

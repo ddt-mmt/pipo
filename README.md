@@ -117,7 +117,7 @@ pipo test
 pipo test /path/to/my_project
 ```
 
-### `pipo init-ci [path] [--platform {github-actions}]`
+### `pipo init-ci [path] [--platform {github-actions}] [--docker-image-name DOCKER_IMAGE_NAME] [--push-docker-image]`
 
 Generates a basic CI/CD configuration file for the project.
 
@@ -125,6 +125,8 @@ Generates a basic CI/CD configuration file for the project.
 
 *   `path`: The path to the project directory where the CI config will be generated (defaults to current directory).
 *   `--platform`: The CI/CD platform for which to generate the configuration (e.g., `github-actions`). Default is `github-actions`.
+*   `--docker-image-name`: The name of the Docker image to build and push (e.g., `your_username/your_repo`). Default is `pipo-app`.
+*   `--push-docker-image`: Set this flag to enable pushing the Docker image to a registry. Requires `DOCKER_USERNAME` and `DOCKER_PASSWORD` GitHub Secrets.
 
 **Usage Examples:**
 
@@ -134,6 +136,9 @@ pipo init-ci
 
 # Generate GitHub Actions CI config for a specific project
 pipo init-ci /path/to/my_project --platform github-actions
+
+# Generate GitHub Actions CI config with a custom Docker image name and enable push
+pipo init-ci --docker-image-name my_username/my_app --push-docker-image
 ```
 
 ## Mendapatkan Bantuan

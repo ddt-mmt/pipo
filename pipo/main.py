@@ -217,51 +217,28 @@ def _init_ci(args):
 
     ci_content = ""
     if platform == 'github-actions':
-        ci_content = """name: CI/CD Pipeline
+        ci_content = f"""name: CI/CD Pipeline
 
 on:
   push:
     branches:
       - main
+      - master
   pull_request:
     branches:
       - main
+      - master
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest
-
-    - name: Run tests
-      run: pipo test .
-
-    - name: Build Docker image
-      run: pipo dockerize .
-
-    # Uncomment the following steps to push the Docker image to a registry
-    # You will need to set up Docker credentials as GitHub Secrets (e.g., DOCKER_USERNAME, DOCKER_PASSWORD)
-    # - name: Log in to Docker Hub
-    #   uses: docker/login-action@v2
-    #   with:
-    #     username: ${{ secrets.DOCKER_USERNAME }}
-    #     password: ${{ secrets.DOCKER_PASSWORD }}
-
-    # - name: Push Docker image
-    #   run: docker push pipo-app:latest
+  call-reusable-workflow:
+    uses: ddt-mmt/pipo/.github/workflows/reusable_ci.yml@master # Ganti 'ddt-mmt/pipo' dengan 'username_anda/nama_repo_pipo'
+    with:
+      python-version: '3.x'
+      docker-image-name: '{args.docker_image_name}'
+      push-docker-image: {str(args.push_docker_image).lower()}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 """
     else:
         print(f"{Fore.RED}Error: CI platform '{platform}' not supported yet.{Style.RESET_ALL}", file=sys.stderr)
@@ -390,6 +367,16 @@ def main():
         default='github-actions',
         choices=['github-actions'], # Extend this list as more platforms are supported
         help='The CI/CD platform for which to generate the configuration. Default is github-actions.'
+    )
+    init_ci_parser.add_argument(
+        '--docker-image-name',
+        default='pipo-app',
+        help='The name of the Docker image to build and push (e.g., your_username/your_repo).
+    )
+    init_ci_parser.add_argument(
+        '--push-docker-image',
+        action='store_true',
+        help='Set to true to enable pushing the Docker image to a registry.'
     )
     init_ci_parser.set_defaults(func=_init_ci)
     

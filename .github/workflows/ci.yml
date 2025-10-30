@@ -11,37 +11,23 @@ on:
       - master
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+  call-reusable-workflow:
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
+    uses: ./.github/workflows/reusable_ci.yml@master # Atau @main, atau tag/commit SHA spesifik
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest
+    with:
 
-    - name: Run tests
-      run: pytest
+      python-version: '3.10' # Contoh: tentukan versi
 
-    - name: Build Docker image
-      run: docker build -t pipo-app:latest .
+      docker-image-name: 'ddt-mmt/pipo' # Username Docker Hub Anda/nama repo
 
-    # Uncomment the following steps to push the Docker image to a registry
-    # You will need to set up Docker credentials as GitHub Secrets (e.g., DOCKER_USERNAME, DOCKER_PASSWORD)
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      push-docker-image: true
 
-    - name: Push Docker image
-      run: docker push pipo-app:latest
+    secrets:
+
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+
