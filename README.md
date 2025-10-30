@@ -29,6 +29,17 @@ These options can be used with `pipo` or any of its subcommands.
 *   `pipo --version` or `pipo -v`
     *   Shows the currently installed version of `pipo`.
 
+## Ringkasan Penggunaan
+
+`pipo` adalah alat serbaguna untuk mengelola dependensi Python, membuat Dockerfile, dan lainnya. Berikut adalah ringkasan cepat perintah-perintah utamanya:
+
+*   **`pipo scan [path]`**: Memindai direktori proyek Python dan menghasilkan `requirements.txt`.
+*   **`pipo dockerize [path] [...]`**: Membuat `Dockerfile` dasar untuk proyek Python Anda.
+*   **`pipo update`**: Memperbarui alat `pipo` ke versi terbaru.
+*   **`pipo uninstall`**: Mencopot pemasangan alat `pipo`.
+
+Untuk detail lebih lanjut tentang setiap perintah, silakan lihat bagian "Commands" di bawah.
+
 ## Commands
 
 `pipo` provides several commands to manage your Python projects.
@@ -91,4 +102,50 @@ pipo dockerize /path/to/my_django_project --app-type django --main-file manage.p
 
 # Generate Dockerfile for a simple Python script
 pipo dockerize ./my_script_project --app-type script --main-file run.py
+
+### `pipo test [path]`
+
+Runs `pytest` for the specified Python project directory.
+
+**Usage:**
+
+```bash
+# Run tests in the current directory
+pipo test
+
+# Run tests in a specific project directory
+pipo test /path/to/my_project
+```
+
+### `pipo init-ci [path] [--platform {github-actions}]`
+
+Generates a basic CI/CD configuration file for the project.
+
+**Arguments:**
+
+*   `path`: The path to the project directory where the CI config will be generated (defaults to current directory).
+*   `--platform`: The CI/CD platform for which to generate the configuration (e.g., `github-actions`). Default is `github-actions`.
+
+**Usage Examples:**
+
+```bash
+# Generate GitHub Actions CI config in the current directory
+pipo init-ci
+
+# Generate GitHub Actions CI config for a specific project
+pipo init-ci /path/to/my_project --platform github-actions
+```
+
+## Mendapatkan Bantuan
+
+Jika Anda membutuhkan bantuan lebih lanjut atau informasi detail tentang perintah `pipo`, Anda dapat menggunakan opsi `--help` pada perintah utama atau sub-perintah:
+
+*   **Bantuan Umum:**
+    ```bash
+    pipo --help
+    ```
+*   **Bantuan untuk Perintah Spesifik (misalnya `scan`):**
+    ```bash
+    pipo scan --help
+    ```
 ```

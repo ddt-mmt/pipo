@@ -84,38 +84,6 @@ def _uninstall_pipo():
         print(f"{Fore.RED}An unexpected error occurred: {e}{Style.RESET_ALL}", file=sys.stderr)
         sys.exit(1)
 
-def _dockerize_project(path, app_type, main_file, port):
-    """Generates a Dockerfile for the project."""
-    dockerfile_content = """
-# Use the official Python image as a base image
-FROM python:3.10-slim-buster
-
-# Set the working directory in the container
-WORKDIR /app
-
-# Salin file requirements.txt dan instal dependensi
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Salin sisa kode aplikasi
-COPY . .
-
-# Ekspos port yang digunakan aplikasi (misal: 5000 untuk Flask)
-EXPOSE {port}
-
-# Perintah untuk menjalankan aplikasi
-CMD ["gunicorn", "--bind", "0.0.0.0:{port}", "{main_file}:app"]
-""".format(port=port, main_file=main_file.replace('.py', ''))
-
-    output_path = os.path.join(path, 'Dockerfile')
-    try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(dockerfile_content)
-        print(f"{Fore.GREEN}Dockerfile successfully generated at {output_path}{Style.RESET_ALL}")
-    except IOError as e:
-        print(f"{Fore.RED}Error writing Dockerfile to {output_path}: {e}{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-
 def _dockerize_project(args): # args parameter used directly
     """Generates a Dockerfile for the project."""
     path = os.path.abspath(args.path)
@@ -130,7 +98,7 @@ def _dockerize_project(args): # args parameter used directly
     # Basic Dockerfile content
     dockerfile_content = f"""
 # Use the official Python image as a base image
-FROM python:3.10-slim-buster
+FROM python:3.11-slim
 
 # Set the working directory in the container
 WORKDIR /app
@@ -213,6 +181,101 @@ def run_scan_command(args): # Scan logic extracted to a function
         sys.exit(1)
 
 
+def _run_tests(args):
+    """Runs pytest for the specified project path."""
+    project_path = os.path.abspath(args.path)
+    if not os.path.isdir(project_path):
+        print(f"{Fore.RED}Error: Path '{project_path}' is not a valid directory.{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"{Fore.CYAN}Running tests in: {project_path}{Style.RESET_ALL}")
+    try:
+        subprocess.run([sys.executable, "-m", "pytest", project_path], check=True)
+        print(f"{Fore.GREEN}Tests completed successfully!{Style.RESET_ALL}")
+    except subprocess.CalledProcessError as e:
+        print(f"{Fore.RED}Tests failed: {e}{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"{Fore.RED}Error: pytest command not found. Please ensure pytest is installed (`pip install pytest`).{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"{Fore.RED}An unexpected error occurred during testing: {e}{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _init_ci(args):
+    """Generates a basic CI/CD configuration file."""
+    project_path = os.path.abspath(args.path)
+    if not os.path.isdir(project_path):
+        print(f"{Fore.RED}Error: Path '{project_path}' is not a valid directory.{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+    platform = args.platform.lower()
+    output_dir = os.path.join(project_path, '.github', 'workflows')
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, 'ci.yml')
+
+    ci_content = ""
+    if platform == 'github-actions':
+        ci_content = """name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+
+    - name: Run tests
+      run: pipo test .
+
+    - name: Build Docker image
+      run: pipo dockerize .
+
+    # Uncomment the following steps to push the Docker image to a registry
+    # You will need to set up Docker credentials as GitHub Secrets (e.g., DOCKER_USERNAME, DOCKER_PASSWORD)
+    # - name: Log in to Docker Hub
+    #   uses: docker/login-action@v2
+    #   with:
+    #     username: ${{ secrets.DOCKER_USERNAME }}
+    #     password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # - name: Push Docker image
+    #   run: docker push pipo-app:latest
+"""
+    else:
+        print(f"{Fore.RED}Error: CI platform '{platform}' not supported yet.{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(ci_content)
+        print(f"{Fore.GREEN}CI configuration for {platform} successfully generated at {output_path}{Style.RESET_ALL}")
+    except IOError as e:
+        print(f"{Fore.RED}Error writing CI configuration to {output_path}: {e}{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     """Main entry point for the pipo CLI tool."""
     init(autoreset=True) # Initialize Colorama
@@ -223,10 +286,22 @@ def main():
         version = '0.0.1' # Fallback version if package is not installed
 
     # Generate and print banner
-    f = Figlet(font='slant')
-    print(Fore.CYAN + f.renderText('pipo') + Style.RESET_ALL)
-    print(Fore.GREEN + "A modern tool to generate requirements.txt for a Python project." + Style.RESET_ALL)
-    print(Fore.YELLOW + f"Version: {version}\\n" + Style.RESET_ALL)
+    banner = r"""
+██████╗ ██╗██████╗  ██████╗
+██╔══██╗██║██╔══██╗██╔═══██╗
+██████╔╝██║██████╔╝██║   ██║
+██╔═══╝ ██║██╔═══╝ ██║   ██║
+██║     ██║██║     ╚██████╔╝
+╚═╝     ╚═╝╚═╝      ╚═════╝
+"""
+    colors = [Fore.RED, Fore.YELLOW, Fore.GREEN, Fore.CYAN, Fore.BLUE, Fore.MAGENTA]
+    colored_lines = []
+    for i, line in enumerate(banner.split('\n')):
+        if line:
+            colored_lines.append(colors[i % len(colors)] + line)
+    print('\n'.join(colored_lines) + Style.RESET_ALL)
+    print(Fore.CYAN + "A modern tool to generate requirements.txt for a Python project." + Style.RESET_ALL)
+    print(Fore.YELLOW + f"Version: {version}" + Style.RESET_ALL)
 
     parser = argparse.ArgumentParser(
         description="A modern tool to generate requirements.txt for a Python project.",
@@ -292,7 +367,31 @@ def main():
     )
     dockerize_parser.set_defaults(func=_dockerize_project) # Set default function for dockerize
 
+    # Test command
+    test_parser = subparsers.add_parser('test', help='Run pytest for the project')
+    test_parser.add_argument(
+        'path',
+        nargs='?',
+        default='.',
+        help='The path to the project directory where tests will be run (defaults to current directory).'
+    )
+    test_parser.set_defaults(func=_run_tests)
 
+    # Init CI command
+    init_ci_parser = subparsers.add_parser('init-ci', help='Generate a basic CI/CD configuration file for the project.')
+    init_ci_parser.add_argument(
+        'path',
+        nargs='?',
+        default='.',
+        help='The path to the project directory where the CI config will be generated (defaults to current directory).'
+    )
+    init_ci_parser.add_argument(
+        '--platform',
+        default='github-actions',
+        choices=['github-actions'], # Extend this list as more platforms are supported
+        help='The CI/CD platform for which to generate the configuration. Default is github-actions.'
+    )
+    init_ci_parser.set_defaults(func=_init_ci)
     
     args = parser.parse_args()
 

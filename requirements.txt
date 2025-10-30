@@ -1,0 +1,1 @@
+colorama\npyfiglet\npytest\nshutil\nstdlib_list\n
