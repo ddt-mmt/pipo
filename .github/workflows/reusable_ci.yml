@@ -76,7 +76,7 @@ jobs:
         docker build -t ${{ inputs.docker-image-name }}:latest .
 
     - name: Log in to Docker Registry
-      if: "${{ inputs.push-docker-image == 'true' && secrets.DOCKER_USERNAME && secrets.DOCKER_PASSWORD }}"
+      if: ${{ inputs.push-docker-image == 'true' }}
       uses: docker/login-action@v2
       with:
         registry: ${{ inputs.docker-registry }}
@@ -84,5 +84,5 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
 
     - name: Push Docker image
-      if: "${{ inputs.push-docker-image == 'true' && secrets.DOCKER_USERNAME && secrets.DOCKER_PASSWORD }}"
+      if: ${{ inputs.push-docker-image == 'true' }}
       run: docker push ${{ inputs.docker-image-name }}:latest

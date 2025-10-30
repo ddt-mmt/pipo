@@ -371,7 +371,7 @@ def main():
     init_ci_parser.add_argument(
         '--docker-image-name',
         default='pipo-app',
-        help='The name of the Docker image to build and push (e.g., your_username/your_repo).
+        help='The name of the Docker image to build and push (e.g., your_username/your_repo).',
     )
     init_ci_parser.add_argument(
         '--push-docker-image',
