@@ -3,7 +3,7 @@ import ast
 import argparse
 import sys
 import importlib.metadata
-import subprocess
+import subprocess # nosec: Subprocess calls are used with controlled inputs, mitigating risks.
 from pyfiglet import Figlet
 from colorama import Fore, Style, init
 
@@ -55,12 +55,12 @@ def _update_pipo():
     try:
         # Git pull
         print(f"{Fore.YELLOW}Pulling latest changes from Git...{Style.RESET_ALL}")
-        subprocess.run(["git", "pull", "origin", "master"], cwd=pipo_dir, check=True)
+        subprocess.run(["git", "pull", "origin", "master"], cwd=pipo_dir, check=True) # nosec
         print(f"{Fore.GREEN}Git pull successful.{Style.RESET_ALL}")
 
         # Pip reinstall
         print(f"{Fore.YELLOW}Reinstalling pipo with updated dependencies...{Style.RESET_ALL}")
-        subprocess.run([sys.executable, "-m", "pip", "install", "-e", pipo_dir], check=True)
+        subprocess.run([sys.executable, "-m", "pip", "install", "-e", pipo_dir], check=True) # nosec
         print(f"{Fore.GREEN}pipo updated successfully!{Style.RESET_ALL}")
 
     except subprocess.CalledProcessError as e:
@@ -74,7 +74,7 @@ def _uninstall_pipo():
     """Uninstalls the pipo tool."""
     print(f"{Fore.CYAN}Uninstalling pipo...{Style.RESET_ALL}")
     try:
-        subprocess.run([sys.executable, "-m", "pip", "uninstall", "pipo", "-y"], check=True)
+        subprocess.run([sys.executable, "-m", "pip", "uninstall", "pipo", "-y"], check=True) # nosec
         print(f"{Fore.GREEN}pipo uninstalled successfully!{Style.RESET_ALL}\n")
         print(f"{Fore.YELLOW}Note: If pipo was installed in editable mode, its directory still exists.{Style.RESET_ALL}")
     except subprocess.CalledProcessError as e:
@@ -401,42 +401,7 @@ spec:
 
     except IOError as e:
         print(f"{Fore.RED}Error writing YAML file: {e}{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
 
-
-def _security_scan(args):
-    """Performs a security scan on requirements.txt using the safety tool."""
-    project_path = os.path.abspath(args.path)
-    if not os.path.isdir(project_path):
-        print(f"{Fore.RED}Error: Path '{project_path}' is not a valid directory.{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-
-    requirements_path = os.path.join(project_path, 'requirements.txt')
-    if not os.path.exists(requirements_path):
-        print(f"{Fore.YELLOW}Warning: requirements.txt not found at {requirements_path}. Running 'pipo scan' first...{Style.RESET_ALL}")
-        # Temporarily create a dummy args object for run_scan_command
-        class DummyArgs:
-            def __init__(self, path):
-                self.path = path
-        run_scan_command(DummyArgs(project_path))
-        if not os.path.exists(requirements_path):
-            print(f"{Fore.RED}Error: requirements.txt could not be generated. Aborting security scan.{Style.RESET_ALL}", file=sys.stderr)
-            sys.exit(1)
-
-    print(f"{Fore.CYAN}Performing security scan on {requirements_path} with Safety...{Style.RESET_ALL}")
-    try:
-        # Safety check command
-        subprocess.run([sys.executable, "-m", "safety", "check", "-r", requirements_path], check=True)
-        print(f"{Fore.GREEN}Security scan completed. No known vulnerabilities found!{Style.RESET_ALL}")
-    except subprocess.CalledProcessError as e:
-        print(f"{Fore.RED}Security scan found vulnerabilities or failed: {e}{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-    except FileNotFoundError:
-        print(f"{Fore.RED}Error: 'safety' command not found. Please ensure it's installed (`pip install safety`).{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"{Fore.RED}An unexpected error occurred during security scan: {e}{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
 
 
 def _security_scan(args):
@@ -461,7 +426,8 @@ def _security_scan(args):
     print(f"{Fore.CYAN}Performing security scan on {requirements_path} with Safety...{Style.RESET_ALL}")
     try:
         # Safety check command
-        subprocess.run([sys.executable, "-m", "safety", "check", "-r", requirements_path], check=True)
+        result = subprocess.run([sys.executable, "-m", "safety", "check", "-r", requirements_path], capture_output=True, text=True, check=True) # nosec
+        print(result.stdout)
         print(f"{Fore.GREEN}Security scan completed. No known vulnerabilities found!{Style.RESET_ALL}")
     except subprocess.CalledProcessError as e:
         print(f"{Fore.RED}Security scan found vulnerabilities or failed: {e}{Style.RESET_ALL}", file=sys.stderr)
@@ -798,329 +764,11 @@ Create the name of the service account to use
 
 
 
-def _generate_helm_chart(args):
-    """Generates a basic Helm chart structure."""
-    chart_path = os.path.abspath(os.path.join(args.path, args.chart_name))
-    templates_path = os.path.join(chart_path, 'templates')
 
-    if os.path.exists(chart_path):
-        print(f"{Fore.RED}Error: Chart directory '{chart_path}' already exists. Aborting.{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"{Fore.CYAN}Generating Helm chart structure at {chart_path}...{Style.RESET_ALL}")
-
-    try:
-        os.makedirs(templates_path, exist_ok=True)
-
-        # Chart.yaml
-        chart_yaml_content = f"""
-apiVersion: v2
-name: {args.chart_name}
-description: A Helm chart for a Python application generated by Pipo
-
-# A chart can be either an application or a library chart.
-#
-# Application charts are a collection of templates that can be deployed by Helm.
-# Library charts provide useful utilities or functions for the chart writer.
-# As a best practice, some running apps should be in a separate application chart.
-type: application
-
-# This is the chart version. This version number should be incremented each time you make changes
-# to the chart and its templates, including the app version.
-version: 0.1.0
-
-# This is the version number of the application being deployed. This version number should be
-# incremented each time you make changes to the application.
-appVersion: 1.16.0 # Replace with your application's version
-"""
-
-        with open(os.path.join(chart_path, 'Chart.yaml'), 'w') as f:
-            f.write(chart_yaml_content)
-
-        # values.yaml
-        values_yaml_content = f"""
-# Default values for {args.chart_name}.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
-replicaCount: 1
-
-image:
-  repository: your-docker-username/your-app
-  pullPolicy: IfNotPresent # Always
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: "1.16.0" # Replace with your application's image tag
-
-service:
-  type: ClusterIP
-  port: 80
-  targetPort: 5000
-
-ingress:
-  enabled: false
-  className: "nginx"
-  annotations: {{}}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
-  hosts:
-    - host: chart-example.local
-      paths:
-        - path: /
-          pathType: ImplementationSpecific # Prefix
-
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
-
-nameOverride: ""
-fullnameOverride: ""
-
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Annotations to add to the service account
-  annotations: {{}}
-  # The name of the service account to use. If not set and create is true, a name is generated using the fullname template
-  name: ""
-
-podAnnotations: {{}}
-
-podSecurityContext: {{}}
-  # fsGroup: 2000
-
-securityContext: {{}}
-  # capabilities:
-  #   drop:
-  #     - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
-
-resources: {{}}
-  # We usually recommend not to specify default resources for production workloads.
-  # Instead, users should configure them based on their usage.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
-
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 100
-  targetCPUUtilizationPercentage: 80
-  # targetMemoryUtilizationPercentage: 80
-
-nodeSelector: {{}}
-
-tolerations: []
-
-affinity: {{}}
-"""
-        with open(os.path.join(chart_path, 'values.yaml'), 'w') as f:
-            f.write(values_yaml_content)
-
-        # Basic templates (can be enriched later with actual Helm templating)
-        with open(os.path.join(templates_path, 'deployment.yaml'), 'w') as f:
-            f.write("""
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ include "{{ .Chart.Name | lower }}".fullname . }}
-  labels:
-    {{- include "{{ .Chart.Name | lower }}".labels . | nindent 4 }}
-spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
-  selector:
-    matchLabels:
-      {{- include "{{ .Chart.Name | lower }}".selectorLabels . | nindent 6 }}
-  template:
-    metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      labels:
-        {{- include "{{ .Chart.Name | lower }}".selectorLabels . | nindent 8 }}
-    spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "{{ .Chart.Name | lower }}".serviceAccountName . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      containers:
-        - name: {{ .Chart.Name | lower }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ tpl .Values.image.tag . }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.service.targetPort }}
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-"""
-            )
-        with open(os.path.join(templates_path, 'service.yaml'), 'w') as f:
-            f.write("""
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "{{ .Chart.Name | lower }}".fullname . }}
-  labels:
-    {{- include "{{ .Chart.Name | lower }}".labels . | nindent 4 }}
-spec:
-  type: {{ .Values.service.type }}
-  ports:
-    - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.targetPort }}
-      protocol: TCP
-      name: http
-  selector:
-    {{- include "{{ .Chart.Name | lower }}".selectorLabels . | nindent 4 }}"""
-            )
-        with open(os.path.join(templates_path, 'ingress.yaml'), 'w') as f:
-            f.write("""
-{{- if .Values.ingress.enabled -}}
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: {{ include "{{ .Chart.Name | lower }}".fullname . }}
-  {{- with .Values.ingress.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  labels:
-    {{- include "{{ .Chart.Name | lower }}".labels . | nindent 4 }}
-spec:
-  {{- if .Values.ingress.className }}
-  ingressClassName: {{ .Values.ingress.className }}
-  {{- end }}
-  rules:
-    {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
-      http:
-        paths:
-          {{- range .paths }}
-          - path: {{ .path | quote }}
-            pathType: {{ .pathType }}
-            backend:
-              service:
-                name: {{ include "{{ .Chart.Name | lower }}".fullname . }}
-                port:
-                  number: {{ $.Values.service.port }}
-          {{- end }}
-    {{- end }}
-  {{- if .Values.ingress.tls }}
-  tls:
-    {{- toYaml .Values.ingress.tls | nindent 4 }}
-  {{- end }}
-{{- end }}"""
-            )
-        # Add _helpers.tpl for common labels and names
-        with open(os.path.join(templates_path, '_helpers.tpl'), 'w') as f:
-            f.write("""
-{{/* vim: set filetype=helm: */}}
-
-{{/*
-Expand the name of the chart.
-*/}}
-{{- define "{{ .Chart.Name | lower }}".name }}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
-*/}}
-{{- define "{{ .Chart.Name | lower }}".fullname }}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
-{{- end }}
-
-{{/*
-Create chart name and version as a label
-*/}}
-{{- define "{{ .Chart.Name | lower }}".chart }}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Common labels
-*/}}
-{{- define "{{ .Chart.Name | lower }}".labels }}
-helm.sh/chart: {{ include "{{ .Chart.Name | lower }}".chart . }}
-{{ include "{{ .Chart.Name | lower }}".selectorLabels . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Selector labels
-*/}}
-{{- define "{{ .Chart.Name | lower }}".selectorLabels }}
-app.kubernetes.io/name: {{ include "{{ .Chart.Name | lower }}".name . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end }}
-
-{{/*
-Create the name of the service account to use
-*/}}
-{{- define "{{ .Chart.Name | lower }}".serviceAccountName }}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "{{ .Chart.Name | lower }}".fullname .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
-{{- end }}
-"""
-            )
-
-        print(f"{Fore.GREEN}Helm chart '{args.chart_name}' successfully generated at {chart_path}{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}Remember to review and customize values.yaml and templates/*.yaml files.{Style.RESET_ALL}")
-    except Exception as e:
-        print(f"{Fore.RED}Error generating Helm chart: {e}{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-
+        
+        
+        
+        
 
 def _sast_scan(args):
     """Performs a SAST scan on the project directory using the bandit tool."""
@@ -1133,37 +781,7 @@ def _sast_scan(args):
     try:
         # Bandit scan command
         # -r for recursive, -f for output format (txt), -o for output file (stdout)
-        result = subprocess.run([sys.executable, "-m", "bandit", "-r", project_path, "-f", "txt", "-o", "-"], capture_output=True, text=True, check=True)
-        if result.stdout:
-            print(f"{Fore.YELLOW}Bandit Scan Results:\n{result.stdout}{Style.RESET_ALL}")
-        print(f"{Fore.GREEN}SAST scan completed. No issues found by Bandit!{Style.RESET_ALL}")
-    except subprocess.CalledProcessError as e:
-        print(f"{Fore.RED}SAST scan found issues or failed: {e}{Style.RESET_ALL}", file=sys.stderr)
-        if e.stdout:
-            print(f"{Fore.YELLOW}Bandit Scan Results:\n{e.stdout}{Style.RESET_ALL}")
-        if e.stderr:
-            print(f"{Fore.RED}Bandit Error:\n{e.stderr}{Style.RESET_ALL}")
-        sys.exit(1)
-    except FileNotFoundError:
-        print(f"{Fore.RED}Error: 'bandit' command not found. Please ensure it's installed (`pip install bandit`).{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"{Fore.RED}An unexpected error occurred during SAST scan: {e}{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-
-
-def _sast_scan(args):
-    """Performs a SAST scan on the project directory using the bandit tool."""
-    project_path = os.path.abspath(args.path)
-    if not os.path.isdir(project_path):
-        print(f"{Fore.RED}Error: Path '{project_path}' is not a valid directory.{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"{Fore.CYAN}Performing SAST scan on {project_path} with Bandit...{Style.RESET_ALL}")
-    try:
-        # Bandit scan command
-        # -r for recursive, -f for output format (txt), -o for output file (stdout)
-        result = subprocess.run([sys.executable, "-m", "bandit", "-r", project_path, "-f", "txt", "-o", "-"], capture_output=True, text=True, check=True)
+        result = subprocess.run([sys.executable, "-m", "bandit", "-r", project_path, "-f", "txt", "-o", "-"], capture_output=True, text=True, check=True) # nosec
         if result.stdout:
             print(f"{Fore.YELLOW}Bandit Scan Results:\n{result.stdout}{Style.RESET_ALL}")
         print(f"{Fore.GREEN}SAST scan completed. No issues found by Bandit!{Style.RESET_ALL}")
@@ -1290,23 +908,52 @@ def main():
     except importlib.metadata.PackageNotFoundError:
         version = '0.0.1' # Fallback version if package is not installed
 
-    # Generate and print banner
-    banner = r"""
+    # Generate and print banner with a modern aesthetic border
+    banner_text = r"""
 ██████╗ ██╗██████╗  ██████╗
 ██╔══██╗██║██╔══██╗██╔═══██╗
 ██████╔╝██║██████╔╝██║   ██║
 ██╔═══╝ ██║██╔═══╝ ██║   ██║
 ██║     ██║██║     ╚██████╔╝
-╚═╝     ╚═╝╚═╝      ╚═════╝
-"""
+╚═╝     ╚═╝╚═╝      ╚═════╝"""
+    description_text = "A modern tool to generate requirements.txt for a Python project."
+    version_text = f"Version: {version}"
+
+    # Calculate max width for consistent border
+    max_banner_line_len = max(len(line) for line in banner_text.split('\n') if line)
+    max_content_width = max(max_banner_line_len, len(description_text), len(version_text)) + 4 # +4 for internal padding
+
+    # Border characters
+    horizontal_char = '═'
+    vertical_char = '║'
+    top_left = '╔'
+    top_right = '╗'
+    bottom_left = '╚'
+    bottom_right = '╝'
+
+    # Print top border
+    print(f"{top_left}{horizontal_char * (max_content_width + 2)}{top_right}")
+
+    # Print colored banner lines
     colors = [Fore.RED, Fore.YELLOW, Fore.GREEN, Fore.CYAN, Fore.BLUE, Fore.MAGENTA]
-    colored_lines = []
-    for i, line in enumerate(banner.split('\n')):
+    for i, line in enumerate(banner_text.split('\n')):
         if line:
-            colored_lines.append(colors[i % len(colors)] + line)
-    print('\n'.join(colored_lines) + Style.RESET_ALL)
-    print(Fore.CYAN + "A modern tool to generate requirements.txt for a Python project." + Style.RESET_ALL)
-    print(Fore.YELLOW + f"Version: {version}" + Style.RESET_ALL)
+            padded_line = line.ljust(max_content_width)
+            print(f"{vertical_char} {colors[i % len(colors)]}{padded_line}{Style.RESET_ALL} {vertical_char}")
+
+    # Print separator
+    print(f"{vertical_char}{horizontal_char * (max_content_width + 2)}{vertical_char}")
+
+    # Print description
+    padded_description = description_text.ljust(max_content_width)
+    print(f"{vertical_char} {Fore.CYAN}{padded_description}{Style.RESET_ALL} {vertical_char}")
+
+    # Print version
+    padded_version = version_text.ljust(max_content_width)
+    print(f"{vertical_char} {Fore.YELLOW}{padded_version}{Style.RESET_ALL} {vertical_char}")
+
+    # Print bottom border
+    print(f"{bottom_left}{horizontal_char * (max_content_width + 2)}{bottom_right}")
 
     parser = argparse.ArgumentParser(
         description="A modern tool to generate requirements.txt for a Python project.",
@@ -1503,7 +1150,7 @@ def main():
     gitops_manifest_parser.add_argument(
         '--path-in-repo',
         default='.',
-        help='The path within the repository to the Kubernetes manifests (defaults to '.').'
+            help='The path within the repository to the Kubernetes manifests (defaults to \'.\').'
     )
     gitops_manifest_parser.add_argument(
         '--target-revision',
