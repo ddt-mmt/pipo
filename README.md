@@ -179,5 +179,24 @@ pipo security-scan
 pipo security-scan /path/to/my_project
 ```
 
+### `pipo helm-chart [chart_name] [path]`
+
+Generates a basic Helm chart structure for a Kubernetes application.
+
+**Arguments:**
+
+*   `chart_name`: The name of the Helm chart to create.
+*   `path`: The path where the Helm chart will be generated (defaults to current directory).
+
+**Usage Examples:**
+
+```bash
+# Generate a Helm chart named 'my-app-chart' in the current directory
+pipo helm-chart my-app-chart
+
+# Generate a Helm chart named 'another-app' in a specific directory
+pipo helm-chart another-app /path/to/charts
+```
+
 ## Mendapatkan Bantuan
 ```
