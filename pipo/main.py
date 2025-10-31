@@ -47,28 +47,7 @@ def find_imports(path):
         print(f"Error parsing {path}: {e}", file=sys.stderr)
     return imports
 
-def _update_pipo():
-    """Updates the pipo tool by pulling from git and reinstalling."""
-    pipo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    print(f"{Fore.CYAN}Updating pipo from {pipo_dir}...{Style.RESET_ALL}")
 
-    try:
-        # Git pull
-        print(f"{Fore.YELLOW}Pulling latest changes from Git...{Style.RESET_ALL}")
-        subprocess.run(["git", "pull", "origin", "master"], cwd=pipo_dir, check=True) # nosec
-        print(f"{Fore.GREEN}Git pull successful.{Style.RESET_ALL}")
-
-        # Pip reinstall
-        print(f"{Fore.YELLOW}Reinstalling pipo with updated dependencies...{Style.RESET_ALL}")
-        subprocess.run([sys.executable, "-m", "pip", "install", "-e", pipo_dir], check=True) # nosec
-        print(f"{Fore.GREEN}pipo updated successfully!{Style.RESET_ALL}")
-
-    except subprocess.CalledProcessError as e:
-        print(f"{Fore.RED}Error during update: {e}{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"{Fore.RED}An unexpected error occurred: {e}{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
 
 def _uninstall_pipo():
     """Uninstalls the pipo tool."""
@@ -77,6 +56,9 @@ def _uninstall_pipo():
         subprocess.run([sys.executable, "-m", "pip", "uninstall", "pipo", "-y"], check=True) # nosec
         print(f"{Fore.GREEN}pipo uninstalled successfully!{Style.RESET_ALL}\n")
         print(f"{Fore.YELLOW}Note: If pipo was installed in editable mode, its directory still exists.{Style.RESET_ALL}")
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}Operation cancelled by user.{Style.RESET_ALL}")
+        sys.exit(0)
     except subprocess.CalledProcessError as e:
         print(f"{Fore.RED}Error during uninstallation: {e}{Style.RESET_ALL}", file=sys.stderr)
         sys.exit(1)
@@ -209,15 +191,39 @@ on:
       - master
 
 jobs:
-  call-reusable-workflow:
-    uses: ddt-mmt/pipo/.github/workflows/reusable_ci.yml@master # Ganti 'ddt-mmt/pipo' dengan 'username_anda/nama_repo_pipo'
-    with:
-      python-version: '3.x'
-      docker-image-name: '{args.docker_image_name}'
-      push-docker-image: {str(args.push_docker_image).lower()}
-    secrets:
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Run tests
+        run: pipo test .
+
+      - name: Build Docker image
+        if: {args.push_docker_image}
+        run: pipo dockerize . --docker-image-name {args.docker_image_name}
+
+      - name: Log in to Docker Hub
+        if: {args.push_docker_image}
+        uses: docker/login-action@v1
+        with:
+          username: ${{{{ secrets.DOCKER_USERNAME }}}}
+          password: ${{{{ secrets.DOCKER_PASSWORD }}}}
+
+      - name: Push Docker image
+        if: {args.push_docker_image}
+        run: docker push {args.docker_image_name}
 """
     else:
         print(f"{Fore.RED}Error: CI platform '{platform}' not supported yet.{Style.RESET_ALL}", file=sys.stderr)
@@ -239,76 +245,80 @@ def _generate_kube_manifests(args):
         print(f"{Fore.RED}Error: Path '{project_path}' is not a valid directory.{Style.RESET_ALL}", file=sys.stderr)
         sys.exit(1)
 
-    # --- Get Image Name ---
-    image = args.image
-    if not image:
-        image = input(f"{Fore.CYAN}Enter Docker image name (e.g., your-docker-username/your-app:v1): {Style.RESET_ALL}").strip()
+    try:
+        # --- Get Image Name ---
+        image = args.image
         if not image:
-            print(f"{Fore.RED}Nama image tidak boleh kosong.{Style.RESET_ALL}", file=sys.stderr)
-            sys.exit(1)
-
-    # --- Get App Name ---
-    app_name = args.app_name
-    if not app_name:
-        try:
-            app_name = image.split('/')[-1].split(':')[0]
-        except IndexError:
-            app_name = 'my-app'
-        app_name = input(f"{Fore.CYAN}Enter application name (default: {app_name}): {Style.RESET_ALL}").strip() or app_name
-
-    # --- Get Port ---
-    port = args.port
-    if not port:
-        while True:
-            port_str = input(f"{Fore.CYAN}Enter application container port (default: 8080): {Style.RESET_ALL}").strip()
-            if not port_str:
-                port = 8080
-                break
-            try:
-                port = int(port_str)
-                break
-            except ValueError:
-                print(f"{Fore.RED}Port harus berupa angka.{Style.RESET_ALL}", file=sys.stderr)
-
-    # --- Get Service Type ---
-    service_type = args.service_type
-    valid_service_types = ['NodePort', 'LoadBalancer', 'ClusterIP']
-    if not service_type:
-        while True:
-            service_type = input(f"{Fore.CYAN}Select Service type (NodePort, LoadBalancer, ClusterIP) (default: NodePort): {Style.RESET_ALL}").strip()
-            if not service_type:
-                service_type = 'NodePort'
-                break
-            if service_type in valid_service_types:
-                break
-            else:
-                print(f"{Fore.RED}Tipe Service tidak valid. Pilih salah satu dari: {', '.join(valid_service_types)}{Style.RESET_ALL}", file=sys.stderr)
-
-    # --- Get Namespace ---
-    namespace = args.namespace
-    if not namespace:
-        namespace = input(f"{Fore.CYAN}Enter Kubernetes Namespace (default: default): {Style.RESET_ALL}").strip() or 'default'
-
-    # --- Get Ingress details if requested ---
-    generate_ingress = args.ingress
-    ingress_host = args.host
-    ingress_path = args.path_ingress # Renamed to avoid conflict with project path
-    ingress_class = args.ingress_class
-
-    if not generate_ingress:
-        generate_ingress_str = input(f"{Fore.CYAN}Do you want to generate Ingress YAML? (y/N): {Style.RESET_ALL}").strip().lower()
-        generate_ingress = (generate_ingress_str == 'y')
-
-    if generate_ingress:
-        if not ingress_host:
-            ingress_host = input(f"{Fore.CYAN}Enter Ingress hostname (e.g., your-app.example.com): {Style.RESET_ALL}").strip()
-            if not ingress_host:
-                print(f"{Fore.RED}Hostname untuk Ingress tidak boleh kosong jika Ingress dibuat.{Style.RESET_ALL}", file=sys.stderr)
+            image = input(f"{Fore.CYAN}Enter Docker image name (e.g., your-docker-username/your-app:v1): {Style.RESET_ALL}").strip()
+            if not image:
+                print(f"{Fore.RED}Nama image tidak boleh kosong.{Style.RESET_ALL}", file=sys.stderr)
                 sys.exit(1)
-        if not ingress_path:
-            ingress_path = input(f"{Fore.CYAN}Enter Ingress path (default: /): {Style.RESET_ALL}").strip() or '/'
-        if not ingress_class:
-            ingress_class = input(f"{Fore.CYAN}Enter Ingress Class (optional, default: nginx): {Style.RESET_ALL}").strip() or 'nginx'
+
+        # --- Get App Name ---
+        app_name = args.app_name
+        if not app_name:
+            try:
+                app_name = image.split('/')[-1].split(':')[0]
+            except IndexError:
+                app_name = 'my-app'
+            app_name = input(f"{Fore.CYAN}Enter application name (default: {app_name}): {Style.RESET_ALL}").strip() or app_name
+
+        # --- Get Port ---
+        port = args.port
+        if not port:
+            while True:
+                port_str = input(f"{Fore.CYAN}Enter application container port (default: 8080): {Style.RESET_ALL}").strip()
+                if not port_str:
+                    port = 8080
+                    break
+                try:
+                    port = int(port_str)
+                    break
+                except ValueError:
+                    print(f"{Fore.RED}Port harus berupa angka.{Style.RESET_ALL}", file=sys.stderr)
+
+        # --- Get Service Type ---
+        service_type = args.service_type
+        valid_service_types = ['NodePort', 'LoadBalancer', 'ClusterIP']
+        if not service_type:
+            while True:
+                service_type = input(f"{Fore.CYAN}Select Service type (NodePort, LoadBalancer, ClusterIP) (default: NodePort): {Style.RESET_ALL}").strip()
+                if not service_type:
+                    service_type = 'NodePort'
+                    break
+                if service_type in valid_service_types:
+                    break
+                else:
+                    print(f"{Fore.RED}Tipe Service tidak valid. Pilih salah satu dari: {', '.join(valid_service_types)}{Style.RESET_ALL}", file=sys.stderr)
+
+        # --- Get Namespace ---
+        namespace = args.namespace
+        if not namespace:
+            namespace = input(f"{Fore.CYAN}Enter Kubernetes Namespace (default: default): {Style.RESET_ALL}").strip() or 'default'
+
+        # --- Get Ingress details if requested ---
+        generate_ingress = args.ingress
+        ingress_host = args.host
+        ingress_path = args.path_ingress # Renamed to avoid conflict with project path
+        ingress_class = args.ingress_class
+
+        if not generate_ingress:
+            generate_ingress_str = input(f"{Fore.CYAN}Do you want to generate Ingress YAML? (y/N): {Style.RESET_ALL}").strip().lower()
+            generate_ingress = (generate_ingress_str == 'y')
+
+        if generate_ingress:
+            if not ingress_host:
+                ingress_host = input(f"{Fore.CYAN}Enter Ingress hostname (e.g., your-app.example.com): {Style.RESET_ALL}").strip()
+                if not ingress_host:
+                    print(f"{Fore.RED}Hostname untuk Ingress tidak boleh kosong jika Ingress dibuat.{Style.RESET_ALL}", file=sys.stderr)
+                    sys.exit(1)
+            if not ingress_path:
+                ingress_path = input(f"{Fore.CYAN}Enter Ingress path (default: /): {Style.RESET_ALL}").strip() or '/'
+            if not ingress_class:
+                ingress_class = input(f"{Fore.CYAN}Enter Ingress Class (optional, default: nginx): {Style.RESET_ALL}").strip() or 'nginx'
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}Operation cancelled by user.{Style.RESET_ALL}")
+        sys.exit(0)
 
 
     # --- Deployment YAML ---
@@ -429,6 +439,9 @@ def _security_scan(args):
         result = subprocess.run([sys.executable, "-m", "safety", "check", "-r", requirements_path], capture_output=True, text=True, check=True) # nosec
         print(result.stdout)
         print(f"{Fore.GREEN}Security scan completed. No known vulnerabilities found!{Style.RESET_ALL}")
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}Operation cancelled by user.{Style.RESET_ALL}")
+        sys.exit(0)
     except subprocess.CalledProcessError as e:
         print(f"{Fore.RED}Security scan found vulnerabilities or failed: {e}{Style.RESET_ALL}", file=sys.stderr)
         sys.exit(1)
@@ -777,14 +790,20 @@ def _sast_scan(args):
         print(f"{Fore.RED}Error: Path '{project_path}' is not a valid directory.{Style.RESET_ALL}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"{Fore.CYAN}Performing SAST scan on {project_path} with Bandit...{Style.RESET_ALL}")
+    # Construct the path to the pipo directory
+    pipo_path = os.path.join(project_path, 'pipo')
+
+    print(f"{Fore.CYAN}Performing SAST scan on {pipo_path} with Bandit...{Style.RESET_ALL}")
     try:
         # Bandit scan command
         # -r for recursive, -f for output format (txt), -o for output file (stdout)
-        result = subprocess.run([sys.executable, "-m", "bandit", "-r", project_path, "-f", "txt", "-o", "-"], capture_output=True, text=True, check=True) # nosec
+        result = subprocess.run([sys.executable, "-m", "bandit", "-r", pipo_path, "-f", "txt", "-o", "-"], capture_output=True, text=True, check=True) # nosec
         if result.stdout:
             print(f"{Fore.YELLOW}Bandit Scan Results:\n{result.stdout}{Style.RESET_ALL}")
         print(f"{Fore.GREEN}SAST scan completed. No issues found by Bandit!{Style.RESET_ALL}")
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}Operation cancelled by user.{Style.RESET_ALL}")
+        sys.exit(0)
     except subprocess.CalledProcessError as e:
         print(f"{Fore.RED}SAST scan found issues or failed: {e}{Style.RESET_ALL}", file=sys.stderr)
         if e.stdout:
@@ -798,6 +817,20 @@ def _sast_scan(args):
     except Exception as e:
         print(f"{Fore.RED}An unexpected error occurred during SAST scan: {e}{Style.RESET_ALL}", file=sys.stderr)
         sys.exit(1)
+
+def _run_tests(args):
+    """Runs tests using pytest."""
+    print(f"{Fore.CYAN}Running tests...{Style.RESET_ALL}")
+    try:
+        result = subprocess.run([sys.executable, "-m", "pytest", args.path], check=True, capture_output=True, text=True) # nosec
+        print(result.stdout)
+        print(f"{Fore.GREEN}Tests completed successfully!{Style.RESET_ALL}")
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}Operation cancelled by user.{Style.RESET_ALL}")
+        sys.exit(0)
+    except subprocess.CalledProcessError as e:
+        print(f"{Fore.RED}Tests failed:\n{e.stderr}{Style.RESET_ALL}", file=sys.stderr)
+        raise e
 
 def _generate_gitops_manifest(args):
     """Generates a basic GitOps manifest (e.g., Argo CD Application)."""
@@ -813,24 +846,28 @@ def _generate_gitops_manifest(args):
     namespace = args.namespace
     tool = args.tool
 
-    if not app_name:
-        app_name = input(f"{Fore.CYAN}Enter application name (default: my-gitops-app): {Style.RESET_ALL}").strip() or 'my-gitops-app'
-    if not repo_url:
-        repo_url = input(f"{Fore.CYAN}Enter Git repository URL (e.g., https://github.com/your-org/your-repo.git): {Style.RESET_ALL}").strip()
+    try:
+        if not app_name:
+            app_name = input(f"{Fore.CYAN}Enter application name (default: my-gitops-app): {Style.RESET_ALL}").strip() or 'my-gitops-app'
         if not repo_url:
-            print(f"{Fore.RED}Repository URL cannot be empty.{Style.RESET_ALL}", file=sys.stderr)
-            sys.exit(1)
-    if not path_in_repo:
-        path_in_repo = input(f"{Fore.CYAN}Enter path within repository to Kubernetes manifests (default: '.'): {Style.RESET_ALL}").strip() or '.'
-    if not target_revision:
-        target_revision = input(f"{Fore.CYAN}Enter target Git revision (branch/tag/commit, default: HEAD): {Style.RESET_ALL}").strip() or 'HEAD'
-    if not namespace:
-        namespace = input(f"{Fore.CYAN}Enter Kubernetes Namespace for deployment (default: default): {Style.RESET_ALL}").strip() or 'default'
-    if not tool:
-        tool = input(f"{Fore.CYAN}Select GitOps tool (argocd, fluxcd) (default: argocd): {Style.RESET_ALL}").strip().lower() or 'argocd'
-        if tool not in ['argocd', 'fluxcd']:
-            print(f"{Fore.RED}Invalid GitOps tool selected. Must be 'argocd' or 'fluxcd'.{Style.RESET_ALL}", file=sys.stderr)
-            sys.exit(1)
+            repo_url = input(f"{Fore.CYAN}Enter Git repository URL (e.g., https://github.com/your-org/your-repo.git): {Style.RESET_ALL}").strip()
+            if not repo_url:
+                print(f"{Fore.RED}Repository URL cannot be empty.{Style.RESET_ALL}", file=sys.stderr)
+                sys.exit(1)
+        if not path_in_repo:
+            path_in_repo = input(f"{Fore.CYAN}Enter path within repository to Kubernetes manifests (default: '.'): {Style.RESET_ALL}").strip() or '.'
+        if not target_revision:
+            target_revision = input(f"{Fore.CYAN}Enter target Git revision (branch/tag/commit, default: HEAD): {Style.RESET_ALL}").strip() or 'HEAD'
+        if not namespace:
+            namespace = input(f"{Fore.CYAN}Enter Kubernetes Namespace for deployment (default: default): {Style.RESET_ALL}").strip() or 'default'
+        if not tool:
+            tool = input(f"{Fore.CYAN}Select GitOps tool (argocd, fluxcd) (default: argocd): {Style.RESET_ALL}").strip().lower() or 'argocd'
+            if tool not in ['argocd', 'fluxcd']:
+                print(f"{Fore.RED}Invalid GitOps tool selected. Must be 'argocd' or 'fluxcd'.{Style.RESET_ALL}", file=sys.stderr)
+                sys.exit(1)
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}Operation cancelled by user.{Style.RESET_ALL}")
+        sys.exit(0)
 
     gitops_manifest_content = ""
     output_filename = ""
@@ -983,9 +1020,17 @@ def main():
     scan_parser.set_defaults(func=run_scan_command) # Set default function for scan
 
 
-    # Update command
-    update_parser = subparsers.add_parser('update', help='Update the pipo tool to the latest version')
-    update_parser.set_defaults(func=_update_pipo)
+    # Test command
+    test_parser = subparsers.add_parser('test', help='Run tests for the project.')
+    test_parser.add_argument(
+        'path',
+        nargs='?',
+        default='.',
+        help='The path to the project directory to test (defaults to the current directory).'
+    )
+    test_parser.set_defaults(func=_run_tests)
+
+
 
     # Uninstall command
     uninstall_parser = subparsers.add_parser('uninstall', help='Uninstall the pipo tool')
@@ -1170,14 +1215,13 @@ def main():
     
     args = parser.parse_args()
 
-    if 'func' in args:
-        args.func(args)
-    else:
-        # If no subcommand is specified, and no default func set for main parser.
-        # This occurs if subparsers.required is False and no subcommand is given.
-        # But we set subparsers.required = True, so this else block might not be reached directly.
-        # However, for robustness or future changes, it's good to have a catch or error out.
-        parser.print_help()
+    try:
+        if 'func' in args:
+            args.func(args)
+        else:
+            parser.print_help()
+    except subprocess.CalledProcessError as e:
+        sys.exit(e.returncode)
 
 
 if __name__ == "__main__":

@@ -51,7 +51,6 @@ These options can be used with `pipo` or any of its subcommands.
 
 *   **`pipo scan [path]`**: Memindai direktori proyek Python dan menghasilkan `requirements.txt`.
 *   **`pipo dockerize [path] [...]`**: Membuat `Dockerfile` dasar untuk proyek Python Anda.
-*   **`pipo update`**: Memperbarui alat `pipo` ke versi terbaru.
 *   **`pipo uninstall`**: Mencopot pemasangan alat `pipo`.
 
 Untuk detail lebih lanjut tentang setiap perintah, silakan lihat bagian "Commands" di bawah.
@@ -76,15 +75,6 @@ pipo scan /root/my_project
 
 In both cases, the resulting `requirements.txt` file will be created inside the scanned project directory.
 
-### `pipo update`
-
-Updates the `pipo` tool to the latest version by pulling changes from its Git repository and reinstalling it.
-
-**Usage:**
-
-```bash
-pipo update
-```
 
 ### `pipo uninstall`
 

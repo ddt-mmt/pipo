@@ -21,6 +21,7 @@ dependencies = [
     "colorama",
     "safety",
     "bandit",
+    "stdlib-list",
 ]
 
 [project.scripts]
