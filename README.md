@@ -141,6 +141,39 @@ pipo init-ci /path/to/my_project --platform github-actions
 pipo init-ci --docker-image-name my_username/my_app --push-docker-image
 ```
 
+### `pipo kube [path] [-i IMAGE] [-a APP_NAME] [-p PORT] [-s SERVICE_TYPE] [-n NAMESPACE] [-g] [--host HOST] [--path-ingress PATH_INGRESS] [--ingress-class INGRESS_CLASS]`
+
+Generates Kubernetes `deployment.yaml`, `service.yaml`, and optionally `ingress.yaml` files for a Python application. This command can be run interactively or by providing all arguments.
+
+**Arguments:**
+
+*   `path`: The path to the project directory where the YAML files will be generated (defaults to current directory).
+*   `-i`, `--image`: The Docker image to deploy (e.g., `yourname/your-app:v1`). **Required if not running interactively.**
+*   `-a`, `--app-name`: The name for the application. Defaults to being derived from the image name.
+*   `-p`, `--port`: The port your container exposes. Default is `8080`.
+*   `-s`, `--service-type`: The type of Kubernetes service to create (choices: `NodePort`, `LoadBalancer`, `ClusterIP`). Default is `NodePort`.
+*   `-n`, `--namespace`: The Kubernetes namespace to deploy to. Default is `default`.
+*   `-g`, `--ingress`: Set this flag to generate an Ingress YAML file. If set, `--host` will be prompted if not provided.
+*   `--host`: The hostname for the Ingress (e.g., `myapp.example.com`). Required if `--ingress` is used and not running interactively.
+*   `--path-ingress`: The path for the Ingress (e.g., `/` or `/api`). Default is `/`.
+*   `--ingress-class`: The Ingress Class to use (e.g., `nginx`, `traefik`). Default is `nginx`.
+
+**Usage Examples:**
+
+```bash
+# Run interactively (will prompt for all details)
+pipo kube
+
+# Generate YAMLs with minimal arguments (will prompt for namespace, ingress details)
+pipo kube -i sooperbot/network-toolkit:v1 -p 5000
+
+# Generate YAMLs with all arguments provided, including Ingress
+pipo kube -i sooperbot/network-toolkit:v1 -p 5000 -n my-app-namespace -g --host myapp.example.com --path-ingress / --ingress-class nginx
+
+# Generate YAMLs for a specific project directory
+pipo kube /path/to/my_project -i myuser/myimage:latest
+```
+
 ## Mendapatkan Bantuan
 
 Jika Anda membutuhkan bantuan lebih lanjut atau informasi detail tentang perintah `pipo`, Anda dapat menggunakan opsi `--help` pada perintah utama atau sub-perintah:

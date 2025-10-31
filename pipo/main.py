@@ -253,6 +253,178 @@ jobs:
         sys.exit(1)
 
 
+def _generate_kube_manifests(args):
+    """Generates Kubernetes deployment, service, and optionally Ingress YAML files interactively or from arguments."""
+    project_path = os.path.abspath(args.path)
+    if not os.path.isdir(project_path):
+        print(f"{Fore.RED}Error: Path '{project_path}' is not a valid directory.{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+    # --- Get Image Name ---
+    image = args.image
+    if not image:
+        image = input(f"{Fore.CYAN}Masukkan nama image Docker (contoh: sooperbot/network-toolkit:v1): {Style.RESET_ALL}").strip()
+        if not image:
+            print(f"{Fore.RED}Nama image tidak boleh kosong.{Style.RESET_ALL}", file=sys.stderr)
+            sys.exit(1)
+
+    # --- Get App Name ---
+    app_name = args.app_name
+    if not app_name:
+        try:
+            app_name = image.split('/')[-1].split(':')[0]
+        except IndexError:
+            app_name = 'my-app'
+        app_name = input(f"{Fore.CYAN}Masukkan nama aplikasi (default: {app_name}): {Style.RESET_ALL}").strip() or app_name
+
+    # --- Get Port ---
+    port = args.port
+    if not port:
+        while True:
+            port_str = input(f"{Fore.CYAN}Masukkan port container aplikasi (default: 8080): {Style.RESET_ALL}").strip()
+            if not port_str:
+                port = 8080
+                break
+            try:
+                port = int(port_str)
+                break
+            except ValueError:
+                print(f"{Fore.RED}Port harus berupa angka.{Style.RESET_ALL}", file=sys.stderr)
+
+    # --- Get Service Type ---
+    service_type = args.service_type
+    valid_service_types = ['NodePort', 'LoadBalancer', 'ClusterIP']
+    if not service_type:
+        while True:
+            service_type = input(f"{Fore.CYAN}Pilih tipe Service (NodePort, LoadBalancer, ClusterIP) (default: NodePort): {Style.RESET_ALL}").strip()
+            if not service_type:
+                service_type = 'NodePort'
+                break
+            if service_type in valid_service_types:
+                break
+            else:
+                print(f"{Fore.RED}Tipe Service tidak valid. Pilih salah satu dari: {', '.join(valid_service_types)}{Style.RESET_ALL}", file=sys.stderr)
+
+    # --- Get Namespace ---
+    namespace = args.namespace
+    if not namespace:
+        namespace = input(f"{Fore.CYAN}Masukkan Namespace (default: default): {Style.RESET_ALL}").strip() or 'default'
+
+    # --- Get Ingress details if requested ---
+    generate_ingress = args.ingress
+    ingress_host = args.host
+    ingress_path = args.path_ingress # Renamed to avoid conflict with project path
+    ingress_class = args.ingress_class
+
+    if not generate_ingress:
+        generate_ingress_str = input(f"{Fore.CYAN}Apakah Anda ingin membuat Ingress YAML? (y/N): {Style.RESET_ALL}").strip().lower()
+        generate_ingress = (generate_ingress_str == 'y')
+
+    if generate_ingress:
+        if not ingress_host:
+            ingress_host = input(f"{Fore.CYAN}Masukkan hostname untuk Ingress (contoh: myapp.example.com): {Style.RESET_ALL}").strip()
+            if not ingress_host:
+                print(f"{Fore.RED}Hostname untuk Ingress tidak boleh kosong jika Ingress dibuat.{Style.RESET_ALL}", file=sys.stderr)
+                sys.exit(1)
+        if not ingress_path:
+            ingress_path = input(f"{Fore.CYAN}Masukkan path untuk Ingress (default: /): {Style.RESET_ALL}").strip() or '/'
+        if not ingress_class:
+            ingress_class = input(f"{Fore.CYAN}Masukkan Ingress Class (opsional, default: nginx): {Style.RESET_ALL}").strip() or 'nginx'
+
+
+    # --- Deployment YAML ---
+    deployment_yaml = f"""
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {app_name}-deployment
+  namespace: {namespace}
+  labels:
+    app: {app_name}
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: {app_name}
+  template:
+    metadata:
+      labels:
+        app: {app_name}
+    spec:
+      containers:
+      - name: {app_name}
+        image: {image}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: {port}
+"""
+
+    # --- Service YAML ---
+    service_yaml = f"""
+apiVersion: v1
+kind: Service
+metadata:
+  name: {app_name}-service
+  namespace: {namespace}
+spec:
+  selector:
+    app: {app_name}
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: {port}
+  type: {service_type}
+"""
+
+    # --- Ingress YAML (Optional) ---
+    ingress_yaml = ""
+    if generate_ingress:
+        ingress_yaml = f"""
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {app_name}-ingress
+  namespace: {namespace}
+  annotations:
+    kubernetes.io/ingress.class: {ingress_class}
+spec:
+  rules:
+  - host: {ingress_host}
+    http:
+      paths:
+      - path: {ingress_path}
+        pathType: Prefix
+        backend:
+          service:
+            name: {app_name}-service
+            port:
+              number: 80
+"""
+
+
+    deployment_output_path = os.path.join(project_path, 'deployment.yaml')
+    service_output_path = os.path.join(project_path, 'service.yaml')
+    ingress_output_path = os.path.join(project_path, 'ingress.yaml')
+
+    try:
+        with open(deployment_output_path, 'w', encoding='utf-8') as f:
+            f.write(deployment_yaml)
+        print(f"{Fore.GREEN}Deployment YAML successfully generated at {deployment_output_path}{Style.RESET_ALL}")
+
+        with open(service_output_path, 'w', encoding='utf-8') as f:
+            f.write(service_yaml)
+        print(f"{Fore.GREEN}Service YAML successfully generated at {service_output_path}{Style.RESET_ALL}")
+
+        if generate_ingress:
+            with open(ingress_output_path, 'w', encoding='utf-8') as f:
+                f.write(ingress_yaml)
+            print(f"{Fore.GREEN}Ingress YAML successfully generated at {ingress_output_path}{Style.RESET_ALL}")
+
+    except IOError as e:
+        print(f"{Fore.RED}Error writing YAML file: {e}{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     """Main entry point for the pipo CLI tool."""
     init(autoreset=True) # Initialize Colorama
@@ -379,6 +551,57 @@ def main():
         help='Set to true to enable pushing the Docker image to a registry.'
     )
     init_ci_parser.set_defaults(func=_init_ci)
+
+    # Kube command
+    kube_parser = subparsers.add_parser('kube', help='Generate Kubernetes deployment and service YAML files')
+    kube_parser.add_argument(
+        'path',
+        nargs='?',
+        default='.',
+        help='The path to the project directory where YAML files will be generated (defaults to current directory).'
+    )
+    kube_parser.add_argument(
+        '-i', '--image',
+        help='The Docker image to deploy (e.g., yourname/your-app:v1).',
+    )
+    kube_parser.add_argument(
+        '-a', '--app-name',
+        help='The name for the application. Defaults to being derived from the image name.'
+    )
+    kube_parser.add_argument(
+        '-p', '--port',
+        type=int,
+        help='The port your container exposes. Default is 8080.'
+    )
+    kube_parser.add_argument(
+        '-s', '--service-type',
+        choices=['NodePort', 'LoadBalancer', 'ClusterIP'],
+        help='The type of Kubernetes service to create. Default is NodePort.'
+    )
+    kube_parser.add_argument(
+        '-n', '--namespace',
+        help='The Kubernetes namespace to deploy to. Default is "default".'
+    )
+    kube_parser.add_argument(
+        '-g', '--ingress',
+        action='store_true',
+        help='Set to generate an Ingress YAML file.'
+    )
+    kube_parser.add_argument(
+        '--host',
+        help='The hostname for the Ingress (e.g., myapp.example.com). Required if --ingress is used.'
+    )
+    kube_parser.add_argument(
+        '--path-ingress',
+        default='/',
+        help='The path for the Ingress (e.g., / or /api). Default is /.'
+    )
+    kube_parser.add_argument(
+        '--ingress-class',
+        default='nginx',
+        help='The Ingress Class to use (e.g., nginx, traefik). Default is nginx.'
+    )
+    kube_parser.set_defaults(func=_generate_kube_manifests)
     
     args = parser.parse_args()
 
