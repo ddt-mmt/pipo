@@ -216,5 +216,29 @@ pipo sast
 pipo sast /path/to/my_project
 ```
 
+### `pipo gitops-manifest [path] [--app-name APP_NAME] [--repo-url REPO_URL] [--path-in-repo PATH_IN_REPO] [--target-revision TARGET_REVISION] [--namespace NAMESPACE] [--tool {argocd,fluxcd}]`
+
+Generates a basic GitOps manifest (e.g., Argo CD Application or Flux CD Kustomization).
+
+**Arguments:**
+
+*   `path`: The path to the project directory where the GitOps manifest will be generated (defaults to current directory).
+*   `--app-name`: The name of the application for the GitOps manifest. Default is derived or prompted.
+*   `--repo-url`: The URL of the Git repository containing the Kubernetes manifests.
+*   `--path-in-repo`: The path within the repository to the Kubernetes manifests (defaults to '.').
+*   `--target-revision`: The target Git revision (branch, tag, or commit SHA). Default is HEAD.
+*   `--namespace`: The Kubernetes Namespace where the application will be deployed. Default is default.
+*   `--tool`: The GitOps tool to generate manifest for (argocd or fluxcd). Default is argocd.
+
+**Usage Examples:**
+
+```bash
+# Generate an Argo CD Application manifest interactively
+pipo gitops-manifest
+
+# Generate a Flux CD Kustomization manifest for a specific repo and path
+pipo gitops-manifest --tool fluxcd --app-name my-flux-app --repo-url https://github.com/my-org/my-k8s-repo.git --path-in-repo ./deploy/prod --target-revision main --namespace production
+```
+
 ## Mendapatkan Bantuan
 ```

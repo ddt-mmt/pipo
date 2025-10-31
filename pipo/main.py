@@ -1152,6 +1152,135 @@ def _sast_scan(args):
         sys.exit(1)
 
 
+def _sast_scan(args):
+    """Performs a SAST scan on the project directory using the bandit tool."""
+    project_path = os.path.abspath(args.path)
+    if not os.path.isdir(project_path):
+        print(f"{Fore.RED}Error: Path '{project_path}' is not a valid directory.{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"{Fore.CYAN}Performing SAST scan on {project_path} with Bandit...{Style.RESET_ALL}")
+    try:
+        # Bandit scan command
+        # -r for recursive, -f for output format (txt), -o for output file (stdout)
+        result = subprocess.run([sys.executable, "-m", "bandit", "-r", project_path, "-f", "txt", "-o", "-"], capture_output=True, text=True, check=True)
+        if result.stdout:
+            print(f"{Fore.YELLOW}Bandit Scan Results:\n{result.stdout}{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}SAST scan completed. No issues found by Bandit!{Style.RESET_ALL}")
+    except subprocess.CalledProcessError as e:
+        print(f"{Fore.RED}SAST scan found issues or failed: {e}{Style.RESET_ALL}", file=sys.stderr)
+        if e.stdout:
+            print(f"{Fore.YELLOW}Bandit Scan Results:\n{e.stdout}{Style.RESET_ALL}")
+        if e.stderr:
+            print(f"{Fore.RED}Bandit Error:\n{e.stderr}{Style.RESET_ALL}")
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"{Fore.RED}Error: 'bandit' command not found. Please ensure it's installed (`pip install bandit`).{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"{Fore.RED}An unexpected error occurred during SAST scan: {e}{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+def _generate_gitops_manifest(args):
+    """Generates a basic GitOps manifest (e.g., Argo CD Application)."""
+    project_path = os.path.abspath(args.path)
+    if not os.path.isdir(project_path):
+        print(f"{Fore.RED}Error: Path '{project_path}' is not a valid directory.{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+    app_name = args.app_name
+    repo_url = args.repo_url
+    path_in_repo = args.path_in_repo
+    target_revision = args.target_revision
+    namespace = args.namespace
+    tool = args.tool
+
+    if not app_name:
+        app_name = input(f"{Fore.CYAN}Enter application name (default: my-gitops-app): {Style.RESET_ALL}").strip() or 'my-gitops-app'
+    if not repo_url:
+        repo_url = input(f"{Fore.CYAN}Enter Git repository URL (e.g., https://github.com/your-org/your-repo.git): {Style.RESET_ALL}").strip()
+        if not repo_url:
+            print(f"{Fore.RED}Repository URL cannot be empty.{Style.RESET_ALL}", file=sys.stderr)
+            sys.exit(1)
+    if not path_in_repo:
+        path_in_repo = input(f"{Fore.CYAN}Enter path within repository to Kubernetes manifests (default: '.'): {Style.RESET_ALL}").strip() or '.'
+    if not target_revision:
+        target_revision = input(f"{Fore.CYAN}Enter target Git revision (branch/tag/commit, default: HEAD): {Style.RESET_ALL}").strip() or 'HEAD'
+    if not namespace:
+        namespace = input(f"{Fore.CYAN}Enter Kubernetes Namespace for deployment (default: default): {Style.RESET_ALL}").strip() or 'default'
+    if not tool:
+        tool = input(f"{Fore.CYAN}Select GitOps tool (argocd, fluxcd) (default: argocd): {Style.RESET_ALL}").strip().lower() or 'argocd'
+        if tool not in ['argocd', 'fluxcd']:
+            print(f"{Fore.RED}Invalid GitOps tool selected. Must be 'argocd' or 'fluxcd'.{Style.RESET_ALL}", file=sys.stderr)
+            sys.exit(1)
+
+    gitops_manifest_content = ""
+    output_filename = ""
+
+    if tool == 'argocd':
+        output_filename = f"argocd-application-{app_name}.yaml"
+        gitops_manifest_content = f"""
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {app_name}
+  namespace: argocd # Argo CD applications are typically managed in the argocd namespace
+spec:
+  destination:
+    namespace: {namespace}
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: {path_in_repo}
+    repoURL: {repo_url}
+    targetRevision: {target_revision}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+"""
+    elif tool == 'fluxcd':
+        output_filename = f"fluxcd-kustomization-{app_name}.yaml"
+        gitops_manifest_content = f"""
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: {app_name}
+  namespace: flux-system # Flux CD Kustomizations are typically managed in the flux-system namespace
+spec:
+  interval: 10m
+  path: {path_in_repo}
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: {app_name}-source
+  targetNamespace: {namespace}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: {app_name}-source
+  namespace: flux-system
+spec:
+  interval: 1m
+  url: {repo_url}
+  ref:
+    branch: {target_revision}
+"""
+
+    output_path = os.path.join(project_path, output_filename)
+
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(gitops_manifest_content)
+        print(f"{Fore.GREEN}GitOps manifest for {tool} successfully generated at {output_path}{Style.RESET_ALL}")
+    except IOError as e:
+        print(f"{Fore.RED}Error writing GitOps manifest to {output_path}: {e}{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     """Main entry point for the pipo CLI tool."""
     init(autoreset=True) # Initialize Colorama
@@ -1354,6 +1483,43 @@ def main():
         help='The path to the Python project directory to scan (defaults to current directory).'
     )
     sast_parser.set_defaults(func=_sast_scan)
+
+    # GitOps Manifest command
+    gitops_manifest_parser = subparsers.add_parser('gitops-manifest', help='Generate a basic GitOps manifest (e.g., Argo CD Application).')
+    gitops_manifest_parser.add_argument(
+        'path',
+        nargs='?',
+        default='.',
+        help='The path to the project directory where the GitOps manifest will be generated (defaults to current directory).'
+    )
+    gitops_manifest_parser.add_argument(
+        '--app-name',
+        help='The name of the application for the GitOps manifest. Default is derived or prompted.'
+    )
+    gitops_manifest_parser.add_argument(
+        '--repo-url',
+        help='The URL of the Git repository containing the Kubernetes manifests.'
+    )
+    gitops_manifest_parser.add_argument(
+        '--path-in-repo',
+        default='.',
+        help='The path within the repository to the Kubernetes manifests (defaults to '.').'
+    )
+    gitops_manifest_parser.add_argument(
+        '--target-revision',
+        default='HEAD',
+        help='The target Git revision (branch, tag, or commit SHA). Default is HEAD.'
+    )
+    gitops_manifest_parser.add_argument(
+        '--namespace',
+        help='The Kubernetes Namespace where the application will be deployed. Default is default.'
+    )
+    gitops_manifest_parser.add_argument(
+        '--tool',
+        choices=['argocd', 'fluxcd'],
+        help='The GitOps tool to generate manifest for (argocd or fluxcd). Default is argocd.'
+    )
+    gitops_manifest_parser.set_defaults(func=_generate_gitops_manifest)
     
     args = parser.parse_args()
 
