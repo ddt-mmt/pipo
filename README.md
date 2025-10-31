@@ -198,5 +198,23 @@ pipo helm-chart my-app-chart
 pipo helm-chart another-app /path/to/charts
 ```
 
+### `pipo sast [path]`
+
+Performs Static Application Security Testing (SAST) on the Python project directory using the [Bandit](https://bandit.readthedocs.io/en/latest/) tool.
+
+**Arguments:**
+
+*   `path`: The path to the Python project directory to scan (defaults to current directory).
+
+**Usage Examples:**
+
+```bash
+# Perform SAST scan on the current directory
+pipo sast
+
+# Perform SAST scan on a specific project directory
+pipo sast /path/to/my_project
+```
+
 ## Mendapatkan Bantuan
 ```
