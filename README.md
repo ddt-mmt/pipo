@@ -103,19 +103,6 @@ pipo dockerize /path/to/my_django_project --app-type django --main-file manage.p
 # Generate Dockerfile for a simple Python script
 pipo dockerize ./my_script_project --app-type script --main-file run.py
 
-### `pipo test [path]`
-
-Runs `pytest` for the specified Python project directory.
-
-**Usage:**
-
-```bash
-# Run tests in the current directory
-pipo test
-
-# Run tests in a specific project directory
-pipo test /path/to/my_project
-```
 
 ### `pipo init-ci [path] [--platform {github-actions}] [--docker-image-name DOCKER_IMAGE_NAME] [--push-docker-image]`
 
@@ -125,7 +112,7 @@ Generates a basic CI/CD configuration file for the project.
 
 *   `path`: The path to the project directory where the CI config will be generated (defaults to current directory).
 *   `--platform`: The CI/CD platform for which to generate the configuration (e.g., `github-actions`). Default is `github-actions`.
-*   `--docker-image-name`: The name of the Docker image to build and push (e.g., `your_username/your_repo`). Default is `pipo-app`.
+*   `--docker-image-name`: The name of the Docker image to build and push (e.g., your-docker-username/your-repo). Default is `pipo-app`.
 *   `--push-docker-image`: Set this flag to enable pushing the Docker image to a registry. Requires `DOCKER_USERNAME` and `DOCKER_PASSWORD` GitHub Secrets.
 
 **Usage Examples:**
@@ -138,23 +125,23 @@ pipo init-ci
 pipo init-ci /path/to/my_project --platform github-actions
 
 # Generate GitHub Actions CI config with a custom Docker image name and enable push
-pipo init-ci --docker-image-name my_username/my_app --push-docker-image
+pipo init-ci --docker-image-name your-docker-username/your-app --push-docker-image
 ```
 
 ### `pipo kube [path] [-i IMAGE] [-a APP_NAME] [-p PORT] [-s SERVICE_TYPE] [-n NAMESPACE] [-g] [--host HOST] [--path-ingress PATH_INGRESS] [--ingress-class INGRESS_CLASS]`
 
-Generates Kubernetes `deployment.yaml`, `service.yaml`, and optionally `ingress.yaml` files for a Python application. This command can be run interactively or by providing all arguments.
+This command is interactive by default, guiding you through the process of generating Kubernetes `deployment.yaml`, `service.yaml`, and optionally `ingress.yaml` files for a Python application. It can also be run non-interactively by providing all arguments.
 
 **Arguments:**
 
 *   `path`: The path to the project directory where the YAML files will be generated (defaults to current directory).
-*   `-i`, `--image`: The Docker image to deploy (e.g., `yourname/your-app:v1`). **Required if not running interactively.**
+*   `The Docker image to deploy (e.g., your-docker-username/your-app:v1).
 *   `-a`, `--app-name`: The name for the application. Defaults to being derived from the image name.
-*   `-p`, `--port`: The port your container exposes. Default is `8080`.
-*   `-s`, `--service-type`: The type of Kubernetes service to create (choices: `NodePort`, `LoadBalancer`, `ClusterIP`). Default is `NodePort`.
+Enter application container port (default: 8080):
+*   `-s`, `--service-type`: Select Service type (NodePort, LoadBalancer, ClusterIP) (default: NodePort):
 *   `-n`, `--namespace`: The Kubernetes namespace to deploy to. Default is `default`.
 *   `-g`, `--ingress`: Set this flag to generate an Ingress YAML file. If set, `--host` will be prompted if not provided.
-*   `--host`: The hostname for the Ingress (e.g., `myapp.example.com`). Required if `--ingress` is used and not running interactively.
+*   `--host`: The hostname for the Ingress (e.g., your-app.example.com). Required if `--ingress` is used and not running interactively.
 *   `--path-ingress`: The path for the Ingress (e.g., `/` or `/api`). Default is `/`.
 *   `--ingress-class`: The Ingress Class to use (e.g., `nginx`, `traefik`). Default is `nginx`.
 
@@ -165,10 +152,9 @@ Generates Kubernetes `deployment.yaml`, `service.yaml`, and optionally `ingress.
 pipo kube
 
 # Generate YAMLs with minimal arguments (will prompt for namespace, ingress details)
-pipo kube -i sooperbot/network-toolkit:v1 -p 5000
-
+pipo kube -i your-docker-username/your-app:v1 -p 5000
 # Generate YAMLs with all arguments provided, including Ingress
-pipo kube -i sooperbot/network-toolkit:v1 -p 5000 -n my-app-namespace -g --host myapp.example.com --path-ingress / --ingress-class nginx
+pipo kube -i your-docker-username/your-app:v1 -p 5000 -n your-namespace -g --host your-app.example.com --path-ingress / --ingress-class nginx
 
 # Generate YAMLs for a specific project directory
 pipo kube /path/to/my_project -i myuser/myimage:latest

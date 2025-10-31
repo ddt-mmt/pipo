@@ -181,27 +181,6 @@ def run_scan_command(args): # Scan logic extracted to a function
         sys.exit(1)
 
 
-def _run_tests(args):
-    """Runs pytest for the specified project path."""
-    project_path = os.path.abspath(args.path)
-    if not os.path.isdir(project_path):
-        print(f"{Fore.RED}Error: Path '{project_path}' is not a valid directory.{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"{Fore.CYAN}Running tests in: {project_path}{Style.RESET_ALL}")
-    try:
-        subprocess.run([sys.executable, "-m", "pytest", project_path], check=True)
-        print(f"{Fore.GREEN}Tests completed successfully!{Style.RESET_ALL}")
-    except subprocess.CalledProcessError as e:
-        print(f"{Fore.RED}Tests failed: {e}{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-    except FileNotFoundError:
-        print(f"{Fore.RED}Error: pytest command not found. Please ensure pytest is installed (`pip install pytest`).{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"{Fore.RED}An unexpected error occurred during testing: {e}{Style.RESET_ALL}", file=sys.stderr)
-        sys.exit(1)
-
 
 def _init_ci(args):
     """Generates a basic CI/CD configuration file."""
@@ -263,7 +242,7 @@ def _generate_kube_manifests(args):
     # --- Get Image Name ---
     image = args.image
     if not image:
-        image = input(f"{Fore.CYAN}Masukkan nama image Docker (contoh: sooperbot/network-toolkit:v1): {Style.RESET_ALL}").strip()
+        image = input(f"{Fore.CYAN}Enter Docker image name (e.g., your-docker-username/your-app:v1): {Style.RESET_ALL}").strip()
         if not image:
             print(f"{Fore.RED}Nama image tidak boleh kosong.{Style.RESET_ALL}", file=sys.stderr)
             sys.exit(1)
@@ -275,13 +254,13 @@ def _generate_kube_manifests(args):
             app_name = image.split('/')[-1].split(':')[0]
         except IndexError:
             app_name = 'my-app'
-        app_name = input(f"{Fore.CYAN}Masukkan nama aplikasi (default: {app_name}): {Style.RESET_ALL}").strip() or app_name
+        app_name = input(f"{Fore.CYAN}Enter application name (default: {app_name}): {Style.RESET_ALL}").strip() or app_name
 
     # --- Get Port ---
     port = args.port
     if not port:
         while True:
-            port_str = input(f"{Fore.CYAN}Masukkan port container aplikasi (default: 8080): {Style.RESET_ALL}").strip()
+            port_str = input(f"{Fore.CYAN}Enter application container port (default: 8080): {Style.RESET_ALL}").strip()
             if not port_str:
                 port = 8080
                 break
@@ -296,7 +275,7 @@ def _generate_kube_manifests(args):
     valid_service_types = ['NodePort', 'LoadBalancer', 'ClusterIP']
     if not service_type:
         while True:
-            service_type = input(f"{Fore.CYAN}Pilih tipe Service (NodePort, LoadBalancer, ClusterIP) (default: NodePort): {Style.RESET_ALL}").strip()
+            service_type = input(f"{Fore.CYAN}Select Service type (NodePort, LoadBalancer, ClusterIP) (default: NodePort): {Style.RESET_ALL}").strip()
             if not service_type:
                 service_type = 'NodePort'
                 break
@@ -308,7 +287,7 @@ def _generate_kube_manifests(args):
     # --- Get Namespace ---
     namespace = args.namespace
     if not namespace:
-        namespace = input(f"{Fore.CYAN}Masukkan Namespace (default: default): {Style.RESET_ALL}").strip() or 'default'
+        namespace = input(f"{Fore.CYAN}Enter Kubernetes Namespace (default: default): {Style.RESET_ALL}").strip() or 'default'
 
     # --- Get Ingress details if requested ---
     generate_ingress = args.ingress
@@ -317,19 +296,19 @@ def _generate_kube_manifests(args):
     ingress_class = args.ingress_class
 
     if not generate_ingress:
-        generate_ingress_str = input(f"{Fore.CYAN}Apakah Anda ingin membuat Ingress YAML? (y/N): {Style.RESET_ALL}").strip().lower()
+        generate_ingress_str = input(f"{Fore.CYAN}Do you want to generate Ingress YAML? (y/N): {Style.RESET_ALL}").strip().lower()
         generate_ingress = (generate_ingress_str == 'y')
 
     if generate_ingress:
         if not ingress_host:
-            ingress_host = input(f"{Fore.CYAN}Masukkan hostname untuk Ingress (contoh: myapp.example.com): {Style.RESET_ALL}").strip()
+            ingress_host = input(f"{Fore.CYAN}Enter Ingress hostname (e.g., your-app.example.com): {Style.RESET_ALL}").strip()
             if not ingress_host:
                 print(f"{Fore.RED}Hostname untuk Ingress tidak boleh kosong jika Ingress dibuat.{Style.RESET_ALL}", file=sys.stderr)
                 sys.exit(1)
         if not ingress_path:
-            ingress_path = input(f"{Fore.CYAN}Masukkan path untuk Ingress (default: /): {Style.RESET_ALL}").strip() or '/'
+            ingress_path = input(f"{Fore.CYAN}Enter Ingress path (default: /): {Style.RESET_ALL}").strip() or '/'
         if not ingress_class:
-            ingress_class = input(f"{Fore.CYAN}Masukkan Ingress Class (opsional, default: nginx): {Style.RESET_ALL}").strip() or 'nginx'
+            ingress_class = input(f"{Fore.CYAN}Enter Ingress Class (optional, default: nginx): {Style.RESET_ALL}").strip() or 'nginx'
 
 
     # --- Deployment YAML ---
@@ -516,15 +495,6 @@ def main():
     )
     dockerize_parser.set_defaults(func=_dockerize_project) # Set default function for dockerize
 
-    # Test command
-    test_parser = subparsers.add_parser('test', help='Run pytest for the project')
-    test_parser.add_argument(
-        'path',
-        nargs='?',
-        default='.',
-        help='The path to the project directory where tests will be run (defaults to current directory).'
-    )
-    test_parser.set_defaults(func=_run_tests)
 
     # Init CI command
     init_ci_parser = subparsers.add_parser('init-ci', help='Generate a basic CI/CD configuration file for the project.')
