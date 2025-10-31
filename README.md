@@ -246,5 +246,9 @@ pipo gitops-manifest
 pipo gitops-manifest --tool fluxcd --app-name my-flux-app --repo-url https://github.com/my-org/my-k8s-repo.git --path-in-repo ./deploy/prod --target-revision main --namespace production
 ```
 
+## Penanganan Interupsi (Ctrl+C)
+
+Semua perintah interaktif dan yang berjalan lama di `pipo` (seperti `kube`, `gitops-manifest`, `security-scan`, `sast`, dan `test`) sekarang dapat dibatalkan dengan aman menggunakan `Ctrl+C`. Program akan keluar dengan baik tanpa menampilkan `traceback` error.
+
 ## Mendapatkan Bantuan
 ```
