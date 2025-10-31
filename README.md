@@ -135,14 +135,14 @@ This command is interactive by default, guiding you through the process of gener
 **Arguments:**
 
 *   `path`: The path to the project directory where the YAML files will be generated (defaults to current directory).
-*   `The Docker image to deploy (e.g., your-docker-username/your-app:v1).
+*   `-i`, `--image`: The Docker image to deploy (e.g., `your-docker-username/your-app:v1`). **Required if not running interactively.**
 *   `-a`, `--app-name`: The name for the application. Defaults to being derived from the image name.
-Enter application container port (default: 8080):
-*   `-s`, `--service-type`: Select Service type (NodePort, LoadBalancer, ClusterIP) (default: NodePort):
-*   `-n`, `--namespace`: The Kubernetes namespace to deploy to. Default is `default`.
+*   `-p`, `--port`: The application container port. Default is `8080`.
+*   `-s`, `--service-type`: The Service type (choices: `NodePort`, `LoadBalancer`, `ClusterIP`). Default is `NodePort`.
+*   `-n`, `--namespace`: The Kubernetes Namespace to deploy to. Default is `default`.
 *   `-g`, `--ingress`: Set this flag to generate an Ingress YAML file. If set, `--host` will be prompted if not provided.
-*   `--host`: The hostname for the Ingress (e.g., your-app.example.com). Required if `--ingress` is used and not running interactively.
-*   `--path-ingress`: The path for the Ingress (e.g., `/` or `/api`). Default is `/`.
+*   `--host`: The Ingress hostname (e.g., `your-app.example.com`). Required if `--ingress` is used and not running interactively.
+*   `--path-ingress`: The Ingress path (e.g., `/` or `/api`). Default is `/`.
 *   `--ingress-class`: The Ingress Class to use (e.g., `nginx`, `traefik`). Default is `nginx`.
 
 **Usage Examples:**
@@ -153,23 +153,31 @@ pipo kube
 
 # Generate YAMLs with minimal arguments (will prompt for namespace, ingress details)
 pipo kube -i your-docker-username/your-app:v1 -p 5000
+
 # Generate YAMLs with all arguments provided, including Ingress
 pipo kube -i your-docker-username/your-app:v1 -p 5000 -n your-namespace -g --host your-app.example.com --path-ingress / --ingress-class nginx
 
 # Generate YAMLs for a specific project directory
-pipo kube /path/to/my_project -i myuser/myimage:latest
+pipo kube /path/to/my_project -i your-docker-username/your-app:latest
+```
+
+### `pipo security-scan [path]`
+
+Scans the `requirements.txt` file for known vulnerabilities using the `safety` tool. If `requirements.txt` is not found, it will attempt to run `pipo scan` first.
+
+**Arguments:**
+
+*   `path`: The path to the Python project directory (defaults to current directory).
+
+**Usage Examples:**
+
+```bash
+# Scan the current directory for vulnerabilities
+pipo security-scan
+
+# Scan a specific project directory
+pipo security-scan /path/to/my_project
 ```
 
 ## Mendapatkan Bantuan
-
-Jika Anda membutuhkan bantuan lebih lanjut atau informasi detail tentang perintah `pipo`, Anda dapat menggunakan opsi `--help` pada perintah utama atau sub-perintah:
-
-*   **Bantuan Umum:**
-    ```bash
-    pipo --help
-    ```
-*   **Bantuan untuk Perintah Spesifik (misalnya `scan`):**
-    ```bash
-    pipo scan --help
-    ```
 ```

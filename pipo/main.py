@@ -404,6 +404,41 @@ spec:
         sys.exit(1)
 
 
+def _security_scan(args):
+    """Performs a security scan on requirements.txt using the safety tool."""
+    project_path = os.path.abspath(args.path)
+    if not os.path.isdir(project_path):
+        print(f"{Fore.RED}Error: Path '{project_path}' is not a valid directory.{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+    requirements_path = os.path.join(project_path, 'requirements.txt')
+    if not os.path.exists(requirements_path):
+        print(f"{Fore.YELLOW}Warning: requirements.txt not found at {requirements_path}. Running 'pipo scan' first...{Style.RESET_ALL}")
+        # Temporarily create a dummy args object for run_scan_command
+        class DummyArgs:
+            def __init__(self, path):
+                self.path = path
+        run_scan_command(DummyArgs(project_path))
+        if not os.path.exists(requirements_path):
+            print(f"{Fore.RED}Error: requirements.txt could not be generated. Aborting security scan.{Style.RESET_ALL}", file=sys.stderr)
+            sys.exit(1)
+
+    print(f"{Fore.CYAN}Performing security scan on {requirements_path} with Safety...{Style.RESET_ALL}")
+    try:
+        # Safety check command
+        subprocess.run([sys.executable, "-m", "safety", "check", "-r", requirements_path], check=True)
+        print(f"{Fore.GREEN}Security scan completed. No known vulnerabilities found!{Style.RESET_ALL}")
+    except subprocess.CalledProcessError as e:
+        print(f"{Fore.RED}Security scan found vulnerabilities or failed: {e}{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"{Fore.RED}Error: 'safety' command not found. Please ensure it's installed (`pip install safety`).{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"{Fore.RED}An unexpected error occurred during security scan: {e}{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     """Main entry point for the pipo CLI tool."""
     init(autoreset=True) # Initialize Colorama
@@ -572,6 +607,16 @@ def main():
         help='The Ingress Class to use (e.g., nginx, traefik). Default is nginx.'
     )
     kube_parser.set_defaults(func=_generate_kube_manifests)
+
+    # Security Scan command
+    security_scan_parser = subparsers.add_parser('security-scan', help='Scan requirements.txt for known vulnerabilities using Safety.')
+    security_scan_parser.add_argument(
+        'path',
+        nargs='?',
+        default='.',
+        help='The path to the Python project directory (defaults to the current directory).'
+    )
+    security_scan_parser.set_defaults(func=_security_scan)
     
     args = parser.parse_args()
 
