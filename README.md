@@ -20,6 +20,16 @@ A modern tool to generate `requirements.txt` for a Python project, inspired by `
 
 `pipo` scans a project directory, analyzes all Python files for their imports, and generates a clean `requirements.txt` file containing only the external dependencies.
 
+## Installation for Users
+
+To install `pipo` as a command-line tool on your system, you can install it directly from its GitHub repository using `pip`:
+
+```bash
+pip install git+https://github.com/ddt-mmt/pipo.git
+```
+
+After installation, `pipo` will be available globally in your terminal.
+
 ## Getting Started (for Development)
 
 If you want to contribute to `pipo` or run it from the source code, follow these steps.
@@ -29,7 +39,7 @@ If you want to contribute to `pipo` or run it from the source code, follow these
 First, clone this repository to your local machine:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/ddt-mmt/pipo.git
 cd pipo
 ```
 
