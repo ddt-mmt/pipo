@@ -832,6 +832,105 @@ def _run_tests(args):
         print(f"{Fore.RED}Tests failed:\n{e.stderr}{Style.RESET_ALL}", file=sys.stderr)
         raise e
 
+def _interactive_devops_flow(args):
+    """Runs a full interactive DevOps flow: scan, dockerize, build, push, and git push."""
+    summary = []
+    project_path = os.path.abspath('.')
+
+    try:
+        # --- 1. Scan for requirements ---
+        print(f"{Fore.CYAN}--- Step 1: Scanning for requirements... ---{Style.RESET_ALL}")
+        class DummyScanArgs:
+            def __init__(self, path):
+                self.path = path
+        run_scan_command(DummyScanArgs(project_path))
+        summary.append("✅ requirements.txt generated.")
+        print(f"{Fore.GREEN}Scan complete.\n{Style.RESET_ALL}")
+
+        # --- 2. Generate Dockerfile ---
+        print(f"{Fore.CYAN}--- Step 2: Generating Dockerfile... ---{Style.RESET_ALL}")
+        class DummyDockerizeArgs:
+            def __init__(self, path, app_type, main_file, port):
+                self.path = path
+                self.app_type = app_type
+                self.main_file = main_file
+                self.port = port
+        
+        app_type = input(f"{Fore.CYAN}Enter app type (flask, django, script) [default: flask]: {Style.RESET_ALL}").strip() or 'flask'
+        main_file = input(f"{Fore.CYAN}Enter main file name [default: app.py]: {Style.RESET_ALL}").strip() or 'app.py'
+        port_str = input(f"{Fore.CYAN}Enter application port [default: 5000]: {Style.RESET_ALL}").strip() or '5000'
+        port = int(port_str)
+
+        _dockerize_project(DummyDockerizeArgs(project_path, app_type, main_file, port))
+        summary.append("✅ Dockerfile generated.")
+        print(f"{Fore.GREEN}Dockerfile generation complete.\n{Style.RESET_ALL}")
+
+        # --- 3. Build and Push Docker image ---
+        print(f"{Fore.CYAN}--- Step 3: Docker Build and Push ---{Style.RESET_ALL}")
+        docker_registry = input(f"{Fore.CYAN}Enter Docker registry URL (e.g., docker.io/username): {Style.RESET_ALL}").strip()
+        if docker_registry:
+            docker_username = input(f"{Fore.CYAN}Enter Docker username: {Style.RESET_ALL}").strip()
+            docker_password = input(f"{Fore.CYAN}Enter Docker password: {Style.RESET_ALL}").strip()
+            image_name = input(f"{Fore.CYAN}Enter Docker image name (e.g., my-app): {Style.RESET_ALL}").strip() or 'my-app'
+            image_tag = input(f"{Fore.CYAN}Enter Docker image tag (e.g., latest): {Style.RESET_ALL}").strip() or 'latest'
+            full_image_name = f"{docker_registry}/{image_name}:{image_tag}"
+
+            print(f"Building Docker image: {full_image_name}")
+            subprocess.run(["docker", "build", "-t", full_image_name, "."], check=True)
+            
+            print(f"Logging in to {docker_registry}...")
+            subprocess.run(["docker", "login", "-u", docker_username, "--password-stdin"], input=docker_password.encode(), check=True)
+
+            print(f"Pushing Docker image to {full_image_name}...")
+            subprocess.run(["docker", "push", full_image_name], check=True)
+            summary.append(f"✅ Docker image pushed to {full_image_name}.")
+            print(f"{Fore.GREEN}Docker build and push complete.\n{Style.RESET_ALL}")
+        else:
+            summary.append("Skipped Docker push.")
+
+        # --- 4. Git Commit and Push ---
+        print(f"{Fore.CYAN}--- Step 4: Git Commit and Push ---{Style.RESET_ALL}")
+        git_repo_url = input(f"{Fore.CYAN}Enter Git repository URL (e.g., https://github.com/user/repo.git): {Style.RESET_ALL}").strip()
+        if git_repo_url:
+            git_username = input(f"{Fore.CYAN}Enter Git username: {Style.RESET_ALL}").strip()
+            git_password = input(f"{Fore.CYAN}Enter Git password/token: {Style.RESET_ALL}").strip()
+            
+            # Add all files
+            subprocess.run(["git", "add", "."], check=True)
+            
+            # Commit
+            commit_message = input(f"{Fore.CYAN}Enter commit message [default: Automated DevOps commit]: {Style.RESET_ALL}").strip() or 'Automated DevOps commit'
+            subprocess.run(["git", "commit", "-m", commit_message], check=True)
+
+            # Push
+            remote_name = "origin" # Assuming origin is the remote name
+            # Check if remote already exists
+            remotes = subprocess.run(["git", "remote"], capture_output=True, text=True).stdout.split()
+            if remote_name not in remotes:
+                subprocess.run(["git", "remote", "add", remote_name, git_repo_url], check=True)
+
+            # Construct the remote URL with credentials
+            # Be careful with this in production environments
+            authenticated_repo_url = git_repo_url.replace("https://", f"https://{git_username}:{git_password}@")
+            
+            current_branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+
+            print(f"Pushing to {git_repo_url}...")
+            subprocess.run(["git", "push", authenticated_repo_url, current_branch], check=True)
+            summary.append(f"✅ Changes pushed to {git_repo_url}.")
+            print(f"{Fore.GREEN}Git commit and push complete.\n{Style.RESET_ALL}")
+        else:
+            summary.append("Skipped Git push.")
+
+    except (subprocess.CalledProcessError, KeyboardInterrupt, EOFError) as e:
+        print(f"\n{Fore.RED}Operation failed or was cancelled: {e}{Style.RESET_ALL}", file=sys.stderr)
+        summary.append(f"❌ Operation failed at step: {e}")
+    finally:
+        # --- 5. Summary ---
+        print(f"\n{Fore.CYAN}--- DevOps Flow Summary ---{Style.RESET_ALL}")
+        for item in summary:
+            print(item)
+
 def _generate_gitops_manifest(args):
     """Generates a basic GitOps manifest (e.g., Argo CD Application)."""
     project_path = os.path.abspath(args.path)
@@ -1212,6 +1311,10 @@ def main():
         help='The GitOps tool to generate manifest for (argocd or fluxcd). Default is argocd.'
     )
     gitops_manifest_parser.set_defaults(func=_generate_gitops_manifest)
+
+    # DevOps Flow command
+    flow_parser = subparsers.add_parser('flow', help='Run a full interactive DevOps flow.')
+    flow_parser.set_defaults(func=_interactive_devops_flow)
     
     args = parser.parse_args()
 

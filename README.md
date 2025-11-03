@@ -20,20 +20,47 @@ A modern tool to generate `requirements.txt` for a Python project, inspired by `
 
 `pipo` scans a project directory, analyzes all Python files for their imports, and generates a clean `requirements.txt` file containing only the external dependencies.
 
+## Getting Started (for Development)
+
+If you want to contribute to `pipo` or run it from the source code, follow these steps.
+
+### 1. Clone the Repository
+
+First, clone this repository to your local machine:
+
+```bash
+git clone <repository-url>
+cd pipo
+```
+
+### 2. Create and Activate a Virtual Environment
+
+It is highly recommended to use a virtual environment to manage project-specific dependencies.
+
+```bash
+# Create a virtual environment named 'venv'
+python3 -m venv venv
+
+# Activate the virtual environment
+# On macOS and Linux:
+source venv/bin/activate
+# On Windows:
+# .\venv\Scripts\activate
+```
+
+### 3. Install Dependencies
+
+Install the required packages using the `requirements.txt` file:
+
+```bash
+pip install -r requirements.txt
+```
+
+Now your development environment is ready!
+
 ## How it Works
 
 The tool uses Python's built-in `ast` (Abstract Syntax Tree) module to safely and accurately parse Python files. It identifies all `import` and `from ... import` statements, filters out standard library modules, and writes the result to a file.
-
-## Installation
-
-To install the tool from the local source code, you can run `pip` from the directory containing the `pipo` folder (e.g., from `/root` if your project is in `/root/pipo`):
-
-```bash
-# We recommend installing in "editable" mode for development
-pip install -e ./pipo
-```
-
-Once installed, `pipo` becomes a global command available in your terminal.
 
 ## Global Options
 
@@ -251,4 +278,3 @@ pipo gitops-manifest --tool fluxcd --app-name my-flux-app --repo-url https://git
 Semua perintah interaktif dan yang berjalan lama di `pipo` (seperti `kube`, `gitops-manifest`, `security-scan`, `sast`, dan `test`) sekarang dapat dibatalkan dengan aman menggunakan `Ctrl+C`. Program akan keluar dengan baik tanpa menampilkan `traceback` error.
 
 ## Mendapatkan Bantuan
-```
